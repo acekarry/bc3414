@@ -1,0 +1,5 @@
+GoogleNews==1.6.15
+GoogleNews==1.6.15
+matplotlib==3.7.2
+pandas==1.5.0
+yfinance==0.2.54
