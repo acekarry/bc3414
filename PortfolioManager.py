@@ -5,6 +5,10 @@ import csv
 import matplotlib.pyplot as plt
 import pandas as pd
 import yfinance as yf
+from thefuzz import process
+from thefuzz import fuzz
+import tkinter as tk
+from tkinter.filedialog import askopenfilename
 
 class PortfolioManager:
     def __init__(self):
@@ -222,34 +226,60 @@ class PortfolioManager:
                 self.validate_ticker(ticker)
 
     def validate_ticker(self, ticker):
-        """Suggests matching tickers for a given partial input."""
+        """Suggests matching tickers for a given partial input or stock name."""
         matches = [valid_ticker for valid_ticker in self.valid_tickers if valid_ticker.startswith(ticker.upper())]
         if matches:
             print("Matching tickers:")
             for match in matches:
                 print(f"{match} - {self.valid_tickers[match]['name']}")
         else:
-            print("No matching tickers found.")
+            top_matches = process.extract(ticker, [i['name'] for i in self.valid_tickers.values()], scorer=fuzz.ratio, limit=5)
+            print("(Ticker - Company Name (Similarity Score)):")
+            for match in top_matches:
+                value = match[0]
+                score = match[1]
+                key = next(k for k, v in self.valid_tickers.items() if v['name'] == value)
+                print(f"{key} - {self.valid_tickers[key]['name']} ({score})")
         return matches
 
     def export_portfolio(self, portfolio_id, filename="portfolio_export.csv"):
         """Exports the portfolio details to a CSV file."""
-        positions = self.db.check_portfolio(portfolio_id)
-        if positions:
+        transactions = self.db.check_portfolio(portfolio_id, export=True)
+        if transactions:
             try:
                 with open(filename, "w", newline="") as csvfile:
                     writer = csv.writer(csvfile)
-                    writer.writerow(["Ticker", "Name", "Quantity", "Avg Purchase Price"])
-                    for ticker, data in positions.items():
-                        if data["quantity"] != 0:
-                            avg_price = data["total_cost"] / data["quantity"]
-                            writer.writerow([ticker, data["name"], data["quantity"], avg_price])
+                    writer.writerow(
+                        ["ticker", "name", "transaction_date", "order_type", "price", "quantity", "limit_price"])
+                    for data in transactions:
+                        writer.writerow(data)
                 print(f"Portfolio exported to {filename}")
             except Exception as e:
                 print(f"Error exporting portfolio: {e}")
         else:
             print("No transactions to export.")
 
+    def import_portfolio(self, portfolio_id, filename=None):
+        """Imports the portfolio details from a CSV file."""
+        try:
+            root = tk.Tk()
+            root.withdraw()
+            root.call('wm', 'attributes', '.', '-topmost', True)
+            filename = askopenfilename()
+            with open(filename, "r") as csvfile:
+                reader = csv.reader(csvfile)
+                headers = next(reader)  # Skip the header row
+                for row in reader:
+                    ticker,name,transaction_date,order_type,price,quantity,limit_price = row
+                    price = float(price)
+                    quantity = int(quantity)
+                    self.db.insert_transaction(portfolio_id,ticker,name,transaction_date,order_type,price,quantity,limit_price)
+                print(f"Portfolio imported from {filename}")
+        except FileNotFoundError:
+            print(f"File {filename} not found.")
+        except Exception as e:
+            print(f"Error importing portfolio: {e}")
+            
     def visualise_portfolio(self, portfolio_id):
         """
         Creates a side-by-side visualization:
