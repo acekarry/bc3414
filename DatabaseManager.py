@@ -58,68 +58,6 @@ class DatabaseManager:
         self.conn.commit()
         return self.cursor.lastrowid
 
-    def get_market_price(self, ticker):
-        """Fetch the latest market price from Yahoo Finance, or the nearest trading day if today's data is unavailable."""
-        try:
-            stock = yf.Ticker(ticker)
-            stock_data = stock.history(period="1d")
-            if stock_data.empty:
-                # If today's data is missing, search backward for the nearest trading day's data.
-                today = datetime.datetime.today()
-                max_lookback = 10  # look back up to 10 days
-                days_back = 0
-                price = None
-                while days_back < max_lookback:
-                    current_date = today - datetime.timedelta(days=days_back)
-                    next_day = current_date + datetime.timedelta(days=1)
-                    data = stock.history(start=current_date.strftime("%Y-%m-%d"),
-                                            end=next_day.strftime("%Y-%m-%d"))
-                    if not data.empty:
-                        price = data["Close"].iloc[0]
-                        break
-                    days_back += 1
-                if price is None:
-                    print(f"Error fetching market data for {ticker}.")
-                return price
-            else:
-                return stock_data["Close"].iloc[-1]
-        except Exception as e:
-            print(f"Error fetching market data for {ticker}: {e}")
-            return None
-
-    def get_historical_price(self, ticker, transaction_date):
-        """Fetch the historical market price for a given date, or the nearest previous trading day if not available."""
-        try:
-            stock = yf.Ticker(ticker)
-            date_obj = datetime.datetime.strptime(transaction_date, "%Y-%m-%d")
-            max_lookback = 10  # limit how many days back we search
-            days_back = 0
-            price = None
-            used_date = None
-
-            while days_back < max_lookback:
-                current_date = date_obj - datetime.timedelta(days=days_back)
-                next_day = current_date + datetime.timedelta(days=1)
-                data = stock.history(start=current_date.strftime("%Y-%m-%d"),
-                                     end=next_day.strftime("%Y-%m-%d"))
-                if not data.empty:
-                    price = data["Close"].iloc[0]
-                    used_date = current_date.strftime("%Y-%m-%d")
-                    break
-                days_back += 1
-
-            if price is None:
-                print(
-                    f"Error: No trading data found for {ticker} within {max_lookback} days of {transaction_date}.")
-                return None
-            if used_date != transaction_date:
-                print(
-                    f"{ticker}: No data on {transaction_date}. Using data from nearest trading day: {used_date}.")
-            return price
-        except Exception as e:
-            print(f"Error fetching historical price for {ticker}: {e}")
-            return None
-
     def insert_transaction(self, portfolio_id, ticker, name, transaction_date, order_type, price, quantity, limit_price=None):
         """Records a transaction (buy/sell) for the portfolio."""
         self.cursor.execute(
