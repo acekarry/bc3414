@@ -5,6 +5,7 @@ import csv
 import matplotlib.pyplot as plt
 import pandas as pd
 import yfinance as yf
+from datetime import date   
 
 class PortfolioManager:
     def __init__(self):
@@ -75,6 +76,32 @@ class PortfolioManager:
         else:
             return self.db.insert_portfolio(owner_id, name)
 
+    def add_historical(self, portfolio_id):
+        while True:
+            ticker = input("Enter stock ticker (or type 'exit' to quit): ").upper()
+            if ticker == "EXIT":
+                break
+
+            if ticker in self.valid_tickers:
+                asset_name = self.valid_tickers[ticker]["name"]
+
+                confirm = input(f"Stock requested - {asset_name} ({ticker})? (y/n): ").lower()
+                if confirm == 'y':
+                    transaction_date = input("Enter transaction date (YYYY-MM-DD): ")
+                    price = float(input("Enter price you bought at: "))
+                    quantity = int(input("Enter quantity: "))
+                    order_type = "historical"
+                    limit_price = None
+                    self.db.insert_transaction(portfolio_id, ticker, asset_name, transaction_date, order_type, price, quantity, limit_price)
+                    print(f"Recorded historical purchase of {quantity} shares of {ticker} on {transaction_date} at ${price:.2f}.")
+                    return
+                else:
+                    print("Transaction canceled.")
+                    self.validate_ticker(ticker)
+            else:
+                print("\nNo matching ticker found. Here are some suggested tickers:")
+                self.validate_ticker(ticker)
+
     def buy_loop(self, portfolio_id):
         while True:
             ticker = input("Enter stock ticker (or type 'exit' to quit): ").upper()
@@ -92,50 +119,28 @@ class PortfolioManager:
                 print(f"\nStock found: {ticker} - {asset_name}")
                 print(f"Current market price: ${market_price:.2f}")
 
-                view_news = input("Would you like to view recent news for this stock? (y/n): ").lower()
-                if view_news == 'y':
-                    self.news_scraper.show_news(asset_name)
-
+                
+                self.news_scraper.show_news(asset_name)
                 confirm = input(f"Do you want to buy {asset_name} ({ticker})? (y/n): ").lower()
                 if confirm == 'y':
-                    historical = input("Do you want to record a historical transaction? (y/n): ").lower()
-                    if historical == 'y':
-                        transaction_date = input("Enter transaction date (YYYY-MM-DD): ")
-                        order_type = input("Enter order type (market/limit): ").lower()
-                        if order_type == 'limit':
-                            limit_price = float(input("Enter limit price: "))
-                            price = limit_price
-                        elif order_type == 'market':
-                            price = self.get_price(ticker, transaction_date)
-                            if price is None:
-                                print("Error fetching historical market price. Transaction canceled.")
-                                continue
-                            limit_price = None
-                        else:
-                            print("Invalid order type. Please try again.")
-                            continue
-                        quantity = int(input("Enter quantity: "))
-                        self.db.insert_transaction(portfolio_id, ticker, asset_name, transaction_date, order_type, price, quantity, limit_price)
-                        print(f"Recorded historical purchase of {quantity} shares of {ticker} on {transaction_date} at ${price:.2f}.")
+                    # For current transactions, use today's date.
+                    transaction_date = str(date.today())
+                    order_type = input("Enter order type (market/limit): ").lower()
+                    if order_type == 'limit':
+                        limit_price = float(input("Enter limit price: "))
+                        price = limit_price
+                    elif order_type == 'market':
+                        price = market_price
+                        limit_price = None
                     else:
-                        # For current transactions, use today's date.
-                        from datetime import date
-                        transaction_date = str(date.today())
-                        order_type = input("Enter order type (market/limit): ").lower()
-                        if order_type == 'limit':
-                            limit_price = float(input("Enter limit price: "))
-                            price = limit_price
-                        elif order_type == 'market':
-                            price = market_price
-                            limit_price = None
-                        else:
-                            print("Invalid order type. Please try again.")
-                            continue
-                        quantity = int(input("Enter quantity: "))
-                        self.db.insert_transaction(portfolio_id, ticker, asset_name, transaction_date, order_type, price, quantity, limit_price)
-                        print(f"Successfully recorded purchase of {quantity} shares of {ticker} at ${price:.2f} on {transaction_date}.")
+                        print("Invalid order type. Please try again.")
+                        continue
+                    quantity = int(input("Enter quantity: "))
+                    self.db.insert_transaction(portfolio_id, ticker, asset_name, transaction_date, order_type, price, quantity, limit_price)
+                    print(f"Successfully recorded purchase of {quantity} shares of {ticker} at ${price:.2f} on {transaction_date}.")
                 else:
                     print("Buy transaction canceled.")
+                    self.validate_ticker(ticker)
             else:
                 print("\nNo matching ticker found. Here are some suggested tickers:")
                 self.validate_ticker(ticker)
@@ -217,6 +222,7 @@ class PortfolioManager:
                         break
                 else:
                     print("Sell/Short transaction canceled.")
+                    self.validate_ticker(ticker)
             else:
                 print("\nNo matching ticker found. Here are some suggested tickers:")
                 self.validate_ticker(ticker)
