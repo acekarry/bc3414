@@ -10,7 +10,7 @@ if __name__ == "__main__":
     portfolio_id = manager.create_portfolio(user_id, portfolio_name)
 
     while True:
-        print("\nOptions: \n1) Buy Stock   \n2) Sell/Short Sell Stock \n3) Add historical transanction\n4) Check Portfolio   \n5) Visualize Portfolio  \n6) Diversification Analysis  \n7) Export Portfolio \n8) Import Portfolio\n8) Exit")
+        print("\nOptions: \n1) Buy Stock   \n2) Sell/Short Sell Stock \n3) Add historical transanction\n4) Check Portfolio   \n5) Visualize Portfolio  \n6) Diversification Analysis  \n7) Export Portfolio \n8) Import Portfolio\n9) Exit")
         choice = input("Enter choice: ")
 
         if choice == "1":
