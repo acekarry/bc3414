@@ -67,7 +67,7 @@ class DatabaseManager:
         self.conn.commit()
         return self.cursor.lastrowid
 
-    def check_portfolio(self, portfolio_id):
+    def check_portfolio(self, portfolio_id, export=False):
         """
         Aggregates transactions to compute current positions.
         For each ticker, transactions are processed in order (by date) to compute
@@ -80,7 +80,9 @@ class DatabaseManager:
         if not transactions:
             print("\nNo transactions found in this portfolio.")
             return {}
-
+        if export:
+            return transactions
+        
         positions = {}
         for t in transactions:
             ticker, name, t_date, order_type, price, quantity, limit_price = t
