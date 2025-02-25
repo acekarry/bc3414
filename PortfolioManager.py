@@ -176,6 +176,7 @@ class PortfolioManager:
             ticker = input("Enter stock ticker to sell/short (or type 'exit' to quit): ").upper()
             if ticker == "EXIT":
                 break
+
             if ticker in self.valid_tickers:
                 asset_name = self.valid_tickers[ticker]["name"]
                 market_price = self.get_price(ticker)
@@ -185,30 +186,10 @@ class PortfolioManager:
 
                 print(f"\nAsset found: {asset_name} ({ticker})")
                 print(f"Current market price: ${market_price:.2f}")
+
+                self.news_scraper.show_news(asset_name)
                 confirm = input(f"Do you want to sell/short {asset_name} ({ticker})? (y/n): ").lower()
                 if confirm == 'y':
-                    historical = input("Do you want to record a historical transaction? (y/n): ").lower()
-                    if historical == 'y':
-                        transaction_date = input("Enter transaction date (YYYY-MM-DD): ")
-                        order_type = input("Enter order type (market/limit): ").lower()
-                        if order_type == 'limit':
-                            limit_price = float(input("Enter limit price: "))
-                            price = limit_price
-                        elif order_type == 'market':
-                            price = self.get_price(ticker, transaction_date)
-                            if price is None:
-                                print("Error fetching historical market price. Transaction canceled.")
-                                continue
-                            limit_price = None
-                        else:
-                            print("Invalid order type. Please try again.")
-                            continue
-                        quantity = int(input("Enter quantity to sell/short: "))
-                        # Record the sale/short as a negative quantity.
-                        self.db.insert_transaction(portfolio_id, ticker, asset_name, transaction_date, order_type, price, -quantity, limit_price)
-                        print(f"Recorded historical sale/short of {quantity} shares of {ticker} on {transaction_date} at ${price:.2f}.")
-                    else:
-                        from datetime import date
                         transaction_date = str(date.today())
                         order_type = input("Enter order type (market/limit): ").lower()
                         if order_type == 'limit':
@@ -223,7 +204,6 @@ class PortfolioManager:
                         quantity = int(input("Enter quantity to sell/short: "))
                         self.db.insert_transaction(portfolio_id, ticker, asset_name, transaction_date, order_type, price, -quantity, limit_price)
                         print(f"Successfully recorded sale/short of {quantity} shares of {ticker} at ${price:.2f} on {transaction_date}.")
-                        break
                 else:
                     print("Sell/Short transaction canceled.")
                     self.validate_ticker(ticker)
