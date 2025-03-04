@@ -74,7 +74,10 @@ class DatabaseManager:
         net quantity and the weighted average cost basis.
         """
         self.cursor.execute(
-            "SELECT ticker, name, transaction_date, order_type, price, quantity, limit_price FROM transactions WHERE portfolio_id = ? ORDER BY transaction_date, id",
+            "SELECT ticker, name, transaction_date, order_type, price, quantity, limit_price \
+            FROM transactions \
+            WHERE portfolio_id = ? \
+            ORDER BY transaction_date, id",
             (portfolio_id,))
         transactions = self.cursor.fetchall()
         if not transactions:
@@ -95,14 +98,19 @@ class DatabaseManager:
                 positions[ticker]["total_cost"] += price * quantity
             else:
                 # For a sell (quantity negative), reduce the position cost basis proportionally.
-                if positions[ticker]["quantity"] > 0:
-                    avg_cost = positions[ticker]["total_cost"] / \
-                        positions[ticker]["quantity"]
+                existing_quantity = positions[ticker]["quantity"]
+                if existing_quantity > 0:
+                    avg_cost = positions[ticker]["total_cost"] / existing_quantity
                 else:
                     avg_cost = 0
+                
                 positions[ticker]["quantity"] += quantity
-                positions[ticker]["total_cost"] += avg_cost * \
-                    quantity  # quantity is negative, so cost decreases
+                
+                if positions[ticker]["quantity"] >= 0:
+                    positions[ticker]["total_cost"] += avg_cost * quantity
+                else:
+                    positions[ticker]["total_cost"] = price * positions[ticker]["quantity"]
+
         return positions
 
     def load_valid_tickers(self, filename="SnP_tickers_sector.csv"):

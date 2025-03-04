@@ -3,7 +3,7 @@ from PortfolioManager import PortfolioManager
 if __name__ == "__main__":
     manager = PortfolioManager()
 
-    name = input("Enter your name: ")
+    name = input("Enter your name: ").strip().lower()
     user_id = manager.login(name) or manager.register(name)
 
     portfolio_name = f"{name}'s Portfolio"

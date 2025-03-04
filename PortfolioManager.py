@@ -149,27 +149,157 @@ class PortfolioManager:
                 print("\nNo matching ticker found. Here are some suggested tickers:")
                 self.validate_ticker(ticker)
 
+
+
+
     def check_portfolio(self, portfolio_id):
         positions = self.db.check_portfolio(portfolio_id)
         if positions:
             print("\nCurrent Portfolio Holdings:")
+
+            total_long_val = 0
+            total_short_val = 0
+            total_long_pnl = 0
+            total_short_pnl = 0
+
             for ticker, data in positions.items():
                 quantity = data["quantity"]
                 if quantity == 0:
                     continue
-                avg_price = data["total_cost"] / quantity if quantity != 0 else 0
+
+                # For shorts, show a positive average entry price.
+                if quantity < 0:
+                    avg_price = abs(data["total_cost"]) / abs(quantity)
+                else:
+                    avg_price = data["total_cost"] / abs(quantity)
+
                 market_price = self.get_price(ticker)
                 if market_price is None:
                     print(f"Could not retrieve market price for {ticker}.")
                     continue
+
+                current_val = market_price * quantity
+
                 if quantity > 0:
                     pnl = (market_price - avg_price) * quantity
-                    print(f"Owned: {data['name']} ({ticker}) - Avg Purchase: ${avg_price:.2f}, Market: ${market_price:.2f}, Quantity: {quantity}, P&L: ${pnl:.2f}")
+                    pos_type = "Owned"
+                    total_long_val += current_val
+                    total_long_pnl += pnl
                 else:
                     pnl = (avg_price - market_price) * abs(quantity)
-                    print(f"Short: {data['name']} ({ticker}) - Avg Sale: ${avg_price:.2f}, Market: ${market_price:.2f}, Quantity: {quantity}, P&L: ${pnl:.2f}")
+                    pos_type = "Short"
+                    total_short_val += current_val
+                    total_short_pnl += pnl
+
+                print(f"{pos_type}: {data['name']} ({ticker}) - Avg Price: ${avg_price:.2f}, "
+                    f"Market Price: ${market_price:.2f}, Quantity: {quantity}, "
+                    f"Current Value: ${current_val:.2f}, P&L: ${pnl:.2f}")
+
+            total_val = total_long_val + total_short_val
+            total_pnl = total_long_pnl + total_short_pnl
+
+            print(f"\nTotal Portfolio Value: ${total_val:.2f}")
+            print(f"Total P&L: ${total_pnl:.2f}")
+
+            # For portfolios with negative (short) total value, use abs(total_val)
+            if total_val != 0:
+                pnl_percentage = (total_pnl / abs(total_val)) * 100
+                print(f"Total P&L (%): {pnl_percentage:.2f}%")
+
+            self.portfolio_performance(
+                portfolio_id, total_long_val, total_short_val, total_long_pnl, total_short_pnl)
+
         else:
             print("No transactions to display.")
+
+
+    def compute_annualized_return(self, initial_investment, final_value, years):
+        if years <= 0 or initial_investment <= 0:
+            return None
+        return (final_value / initial_investment) ** (1 / years) - 1
+
+
+    def portfolio_performance(self, portfolio_id, total_long_val, total_short_val, total_long_pnl, total_short_pnl):
+        """ 
+        Computes annualized return separately for long and short positions,
+        then combines them for total portfolio performance.
+        """
+        try:
+            # Retrieve the earliest transaction date for this portfolio.
+            self.db.cursor.execute(
+                "SELECT MIN(transaction_date) FROM transactions WHERE portfolio_id = ?",
+                (portfolio_id,))
+            earliest_date_str = self.db.cursor.fetchone()[0]
+
+            if not earliest_date_str:
+                print("No transaction data available to compute performance.")
+                return
+
+            earliest_date = datetime.datetime.strptime(
+                earliest_date_str, "%Y-%m-%d")
+            today = datetime.datetime.today()
+            years = (today - earliest_date).days / 365.25
+
+            # Compute annualized return for long positions, if any.
+            if total_long_val > 0:
+                initial_long_investment = total_long_val - total_long_pnl
+                annualized_long_return = self.compute_annualized_return(
+                    initial_long_investment, total_long_val, years)
+                if annualized_long_return is not None:
+                    print(
+                        f"\nAnnualized Long Portfolio Return (%): {annualized_long_return * 100:.2f}%")
+            else:
+                annualized_long_return = None
+
+            # Compute annualized return for short positions, if any.
+            if total_short_val < 0:
+                # For shorts, initial proceeds are the absolute value of (total_short_val - total_short_pnl).
+                initial_short_investment = abs(total_short_val - total_short_pnl)
+                annualized_short_return = self.compute_annualized_return(
+                    initial_short_investment, abs(total_short_val), years)
+                if annualized_short_return is not None:
+                    print(
+                        f"Annualized Short Portfolio Return (%): {annualized_short_return * 100:.2f}%")
+            else:
+                annualized_short_return = None
+
+            # Combined portfolio performance (using absolute values so that shorts are treated correctly).
+            total_val = total_long_val + total_short_val
+            total_pnl = total_long_pnl + total_short_pnl
+            initial_total_investment = abs(total_val - total_pnl)
+            annualized_total_return = self.compute_annualized_return(
+                initial_total_investment, abs(total_val), years)
+
+            if annualized_total_return is not None:
+                print(
+                    f"\nAnnualized Total Portfolio Return (%): {annualized_total_return * 100:.2f}%")
+
+            # Fetch S&P 500 history from the earliest transaction date.
+            sp500 = yf.Ticker("^GSPC")
+            sp500_hist = sp500.history(start=earliest_date_str)
+
+            if not sp500_hist.empty and years > 0:
+                sp500_start = sp500_hist["Close"].iloc[0]
+                sp500_end = sp500_hist["Close"].iloc[-1]
+                annualized_sp_return = self.compute_annualized_return(
+                    sp500_start, sp500_end, years)
+
+                if annualized_sp_return is not None:
+                    print(
+                        f"Annualized S&P 500 Return (%): {annualized_sp_return * 100:.2f}%")
+                    if annualized_total_return is not None:
+                        relative_performance = (
+                            annualized_total_return - annualized_sp_return) * 100
+                        print(f"Annualized Relative Performance (%): "
+                            f"{'+' if relative_performance > 0 else ''}{relative_performance:.2f}%")
+                else:
+                    print("S&P 500 data unavailable for the period.")
+            else:
+                print("S&P 500 data unavailable for the period.")
+
+        except Exception as e:
+            print(f"Error computing annualized returns: {e}")
+
 
     def sell_asset_loop(self, portfolio_id):
         while True:
