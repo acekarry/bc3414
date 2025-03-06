@@ -3,7 +3,18 @@ from PortfolioManager import PortfolioManager
 if __name__ == "__main__":
     manager = PortfolioManager()
 
-    name = input("Enter your name: ").strip().lower()
+    while True:
+        name = input("Enter your name: ").strip().lower()
+
+        if not name:
+            print("Error: Name cannot be empty. Please enter a valid name.")
+        elif any(char.isdigit() for char in name):
+            print("Error: Name cannot contain numbers. Try again.")
+        elif not all(char.isalpha() or char.isspace() for char in name):
+            print("Error: Name can only contain letters and spaces. Try again.")
+        else:
+            break  
+
     user_id = manager.login(name) or manager.register(name)
 
     portfolio_name = f"{name}'s Portfolio"
