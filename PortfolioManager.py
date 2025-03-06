@@ -239,10 +239,10 @@ class PortfolioManager:
                 print("No transaction data available to compute performance.")
                 return
 
-            earliest_date = datetime.datetime.strptime(
-                earliest_date_str, "%Y-%m-%d")
-            today = datetime.datetime.today()
-            years = (today - earliest_date).days / 365.25
+            earliest_date = datetime.datetime.strptime(earliest_date_str, "%Y-%m-%d")
+            # Use local time for performance calculations.
+            today_local = datetime.datetime.today()
+            years = (today_local - earliest_date).days / 365.25
 
             # Compute annualized return for long positions, if any.
             if total_long_val > 0:
@@ -278,9 +278,10 @@ class PortfolioManager:
                 print(
                     f"\nAnnualized Total Portfolio Return (%): {annualized_total_return * 100:.2f}%")
 
-            # Fetch S&P 500 history from the earliest transaction date.
+            # Use the current UTC date for yfinance to avoid timezone issues.
+            today_utc = datetime.datetime.utcnow()
             sp500 = yf.Ticker("^GSPC")
-            sp500_hist = sp500.history(start=earliest_date_str, end=today.strftime("%Y-%m-%d"))
+            sp500_hist = sp500.history(start=earliest_date_str, end=today_utc.strftime("%Y-%m-%d"))
 
             if not sp500_hist.empty and years > 0:
                 sp500_start = sp500_hist["Close"].iloc[0]
@@ -303,6 +304,8 @@ class PortfolioManager:
 
         except Exception as e:
             print(f"Error computing annualized returns: {e}")
+
+
 
 
     def sell_asset_loop(self, portfolio_id):
