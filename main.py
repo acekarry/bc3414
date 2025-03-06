@@ -1,7 +1,10 @@
 from PortfolioManager import PortfolioManager
+from StockExplorer import StockExplorer
+from InputValidator import validate_input
 
 if __name__ == "__main__":
     manager = PortfolioManager()
+    explorer = StockExplorer()
 
     while True:
         name = input("Enter your name: ").strip().lower()
@@ -21,8 +24,8 @@ if __name__ == "__main__":
     portfolio_id = manager.create_portfolio(user_id, portfolio_name)
 
     while True:
-        print("\nOptions: \n1) Buy Stock   \n2) Sell/Short Sell Stock \n3) Add historical transanction\n4) Check Portfolio   \n5) Visualize Portfolio  \n6) Diversification Analysis  \n7) Export Portfolio \n8) Import Portfolio\n9) Exit")
-        choice = input("Enter choice: ")
+        print("\nOptions: \n1) Buy Stock   \n2) Sell/Short Sell Stock \n3) Add historical transanction\n4) Check Portfolio   \n5) Visualize Portfolio  \n6) Diversification Analysis  \n7) Export Portfolio \n8) Import Portfolio\n9) Explore Stocks\n10) Exit")
+        choice = validate_input("Enter choice: ", str)
 
         if choice == "1":
             manager.buy_loop(portfolio_id)
@@ -41,6 +44,8 @@ if __name__ == "__main__":
         elif choice == "8":
             manager.import_portfolio(portfolio_id)
         elif choice == "9":
+            explorer.menu()
+        elif choice == "10":
             print("Exiting...")
             break
         else:

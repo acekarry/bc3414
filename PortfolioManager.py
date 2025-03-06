@@ -16,7 +16,6 @@ class PortfolioManager:
     def __init__(self):
         self.db = DatabaseManager()
         self.valid_tickers = self.db.load_valid_tickers()
-        self.news_scraper = NewsScraper()  # Instantiate the news scraper
 
     def register(self, name):
         return self.db.register_user(name)
@@ -130,7 +129,6 @@ class PortfolioManager:
                 print(f"Current market price: ${market_price:.2f}")
 
                 
-                self.news_scraper.show_news(asset_name)
                 confirm = validate_input(f"Do you want to buy {asset_name} ({ticker})? (y/n): ", str).lower()
                 if confirm == 'y':
                     # For current transactions, use today's date.
@@ -323,7 +321,6 @@ class PortfolioManager:
                 print(f"\nAsset found: {asset_name} ({ticker})")
                 print(f"Current market price: ${market_price:.2f}")
 
-                self.news_scraper.show_news(asset_name)
                 confirm = validate_input(f"Do you want to sell/short {asset_name} ({ticker})? (y/n): ", str).lower()
                 if confirm == 'y':
                         transaction_date = str(date.today())
