@@ -222,7 +222,6 @@ class PortfolioManager:
             return None
         return (final_value / initial_investment) ** (1 / years) - 1
 
-
     def portfolio_performance(self, portfolio_id, total_long_val, total_short_val, total_long_pnl, total_short_pnl):
         """ 
         Computes annualized return separately for long and short positions,
@@ -277,30 +276,6 @@ class PortfolioManager:
             if annualized_total_return is not None:
                 print(
                     f"\nAnnualized Total Portfolio Return (%): {annualized_total_return * 100:.2f}%")
-
-            # Use the current UTC date for yfinance to avoid timezone issues.
-            today_utc = datetime.datetime.utcnow()
-            sp500 = yf.Ticker("^GSPC")
-            sp500_hist = sp500.history(start=earliest_date_str, end=today_utc.strftime("%Y-%m-%d"))
-
-            if not sp500_hist.empty and years > 0:
-                sp500_start = sp500_hist["Close"].iloc[0]
-                sp500_end = sp500_hist["Close"].iloc[-1]
-                annualized_sp_return = self.compute_annualized_return(
-                    sp500_start, sp500_end, years)
-
-                if annualized_sp_return is not None:
-                    print(
-                        f"Annualized S&P 500 Return (%): {annualized_sp_return * 100:.2f}%")
-                    if annualized_total_return is not None:
-                        relative_performance = (
-                            annualized_total_return - annualized_sp_return) * 100
-                        print(f"Annualized Relative Performance (%): "
-                            f"{'+' if relative_performance > 0 else ''}{relative_performance:.2f}%")
-                else:
-                    print("S&P 500 data unavailable for the period.")
-            else:
-                print("S&P 500 data unavailable for the period.")
 
         except Exception as e:
             print(f"Error computing annualized returns: {e}")
