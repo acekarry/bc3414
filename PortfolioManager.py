@@ -10,6 +10,7 @@ from thefuzz import fuzz
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
 from datetime import date
+from InputValidator import validate_input
 
 class PortfolioManager:
     def __init__(self):
@@ -82,18 +83,23 @@ class PortfolioManager:
 
     def add_historical(self, portfolio_id):
         while True:
-            ticker = input("Enter stock ticker (or type 'exit' to quit): ").upper()
+            ticker = validate_input("Enter stock ticker (or type 'exit' to quit): ", str).upper()
             if ticker == "EXIT":
                 break
 
             if ticker in self.valid_tickers:
                 asset_name = self.valid_tickers[ticker]["name"]
 
-                confirm = input(f"Stock requested - {asset_name} ({ticker})? (y/n): ").lower()
+                confirm = validate_input(f"Stock requested - {asset_name} ({ticker})? (y/n): ", str).lower()
                 if confirm == 'y':
-                    transaction_date = input("Enter transaction date (YYYY-MM-DD): ")
-                    price = float(input("Enter price you bought at: "))
-                    quantity = int(input("Enter quantity: "))
+                    while True:
+                        transaction_date = validate_input("Enter transaction date (YYYY-MM-DD): ", str)
+                        if transaction_date > str(date.today()):
+                            print("Transaction date cannot be in the future. Please try again.")
+                        else:
+                            break
+                    price = validate_input("Enter price you bought at: ", float)
+                    quantity = int(validate_input("Enter quantity: ", float))
                     order_type = "historical"
                     limit_price = None
                     self.db.insert_transaction(portfolio_id, ticker, asset_name, transaction_date, order_type, price, quantity, limit_price)
@@ -108,7 +114,7 @@ class PortfolioManager:
 
     def buy_loop(self, portfolio_id):
         while True:
-            ticker = input("Enter stock ticker (or type 'exit' to quit): ").upper()
+            ticker = validate_input("Enter stock ticker (or type 'exit' to quit): ", str).upper()
             if ticker == "EXIT":
                 break
 
@@ -125,13 +131,13 @@ class PortfolioManager:
 
                 
                 self.news_scraper.show_news(asset_name)
-                confirm = input(f"Do you want to buy {asset_name} ({ticker})? (y/n): ").lower()
+                confirm = validate_input(f"Do you want to buy {asset_name} ({ticker})? (y/n): ", str).lower()
                 if confirm == 'y':
                     # For current transactions, use today's date.
                     transaction_date = str(date.today())
-                    order_type = input("Enter order type (market/limit): ").lower()
+                    order_type = validate_input("Enter order type (market/limit): ", str).lower()
                     if order_type == 'limit':
-                        limit_price = float(input("Enter limit price: "))
+                        limit_price = validate_input("Enter limit price: ", str)
                         price = limit_price
                     elif order_type == 'market':
                         price = market_price
@@ -139,7 +145,7 @@ class PortfolioManager:
                     else:
                         print("Invalid order type. Please try again.")
                         continue
-                    quantity = int(input("Enter quantity: "))
+                    quantity = validate_input("Enter quantity: ", float)
                     self.db.insert_transaction(portfolio_id, ticker, asset_name, transaction_date, order_type, price, quantity, limit_price)
                     print(f"Successfully recorded purchase of {quantity} shares of {ticker} at ${price:.2f} on {transaction_date}.")
                 else:
@@ -276,7 +282,7 @@ class PortfolioManager:
 
             # Fetch S&P 500 history from the earliest transaction date.
             sp500 = yf.Ticker("^GSPC")
-            sp500_hist = sp500.history(start=earliest_date_str)
+            sp500_hist = sp500.history(start=earliest_date_str, end=today.strftime("%Y-%m-%d"))
 
             if not sp500_hist.empty and years > 0:
                 sp500_start = sp500_hist["Close"].iloc[0]
@@ -303,7 +309,7 @@ class PortfolioManager:
 
     def sell_asset_loop(self, portfolio_id):
         while True:
-            ticker = input("Enter stock ticker to sell/short (or type 'exit' to quit): ").upper()
+            ticker = validate_input("Enter stock ticker to sell/short (or type 'exit' to quit): ", str).upper()
             if ticker == "EXIT":
                 break
 
@@ -318,12 +324,12 @@ class PortfolioManager:
                 print(f"Current market price: ${market_price:.2f}")
 
                 self.news_scraper.show_news(asset_name)
-                confirm = input(f"Do you want to sell/short {asset_name} ({ticker})? (y/n): ").lower()
+                confirm = validate_input(f"Do you want to sell/short {asset_name} ({ticker})? (y/n): ", str).lower()
                 if confirm == 'y':
                         transaction_date = str(date.today())
-                        order_type = input("Enter order type (market/limit): ").lower()
+                        order_type = validate_input("Enter order type (market/limit): ", str).lower()
                         if order_type == 'limit':
-                            limit_price = float(input("Enter limit price: "))
+                            limit_price = validate_input("Enter limit price: ", float)
                             price = limit_price
                         elif order_type == 'market':
                             price = market_price
@@ -331,7 +337,7 @@ class PortfolioManager:
                         else:
                             print("Invalid order type. Please try again.")
                             continue
-                        quantity = int(input("Enter quantity to sell/short: "))
+                        quantity = validate_input("Enter quantity to sell/short: ", float)
                         self.db.insert_transaction(portfolio_id, ticker, asset_name, transaction_date, order_type, price, -quantity, limit_price)
                         print(f"Successfully recorded sale/short of {quantity} shares of {ticker} at ${price:.2f} on {transaction_date}.")
                 else:
@@ -342,7 +348,7 @@ class PortfolioManager:
                 self.validate_ticker(ticker)
 
     def validate_ticker(self, ticker):
-        """Suggests matching tickers for a given partial input or stock name."""
+        """Suggests matching tickers for a given partial validate_input or stock name."""
         matches = [valid_ticker for valid_ticker in self.valid_tickers if valid_ticker.startswith(ticker.upper())]
         if matches:
             print("Matching tickers:")
