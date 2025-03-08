@@ -70,7 +70,7 @@ class DatabaseManager:
         return self.cursor.lastrowid
     
     def retrieve_portfolio(self,owner_id):
-        self.db.cursor.execute("SELECT id FROM portfolios WHERE owner_id = ?", (owner_id,))
+        self.cursor.execute("SELECT id FROM portfolios WHERE owner_id = ?", (owner_id,))
         existing_portfolio = self.db.cursor.fetchone()
         return existing_portfolio
 
