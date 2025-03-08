@@ -18,7 +18,8 @@ if __name__ == "__main__":
         else:
             break  
 
-    user_id = manager.login(name) or manager.register(name)
+    user = manager.login(name) or manager.register(name)
+    user_id = user.user_id
 
     portfolio_name = f"{name}'s Portfolio"
     portfolio_id = manager.create_portfolio(user_id, portfolio_name)
