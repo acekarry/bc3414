@@ -133,7 +133,7 @@ class PortfolioManager:
                     transaction_date = str(date.today())
                     order_type = validate_input("Enter order type (market/limit): ", str).lower()
                     if order_type == 'limit':
-                        limit_price = validate_input("Enter limit price: ", str)
+                        limit_price = validate_input("Enter limit price: ", float)
                         price = limit_price
                     elif order_type == 'market':
                         price = market_price

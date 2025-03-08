@@ -60,7 +60,7 @@ class DatabaseManager:
         if row:
             return Person(row[0], row[1])
         else:
-            print("Login failed: User not found.")
+            print("Login failed: User not found. Creating a new account...")
             return None
 
     def insert_portfolio(self, owner_id, name):
