@@ -71,9 +71,7 @@ class PortfolioManager:
             return None
 
     def create_portfolio(self, owner_id, name):
-        self.db.cursor.execute("SELECT id FROM portfolios WHERE owner_id = ?", (owner_id,))
-        existing_portfolio = self.db.cursor.fetchone()
-
+        existing_portfolio = self.db.retrieve_portfolio(owner_id)
         if existing_portfolio:
             print(f"User already has a portfolio with ID {existing_portfolio[0]}.")
             return existing_portfolio[0]

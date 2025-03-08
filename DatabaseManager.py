@@ -68,6 +68,11 @@ class DatabaseManager:
             "INSERT INTO portfolios (owner_id, name) VALUES (?, ?)", (owner_id, name))
         self.conn.commit()
         return self.cursor.lastrowid
+    
+    def retrieve_portfolio(self,owner_id):
+        self.db.cursor.execute("SELECT id FROM portfolios WHERE owner_id = ?", (owner_id,))
+        existing_portfolio = self.db.cursor.fetchone()
+        return existing_portfolio
 
     def insert_transaction(self, portfolio_id, ticker, name, transaction_date, order_type, price, quantity, limit_price=None):
         """Records a transaction (buy/sell) for the portfolio."""
