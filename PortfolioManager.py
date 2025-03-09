@@ -525,6 +525,7 @@ class PortfolioManager:
         plt.title("Portfolio Diversification by Sector")
         plt.axis('equal')
         plt.show()
+        
     def view_financial_info(self, ticker):
              try:
                  ticker = ticker.upper()
