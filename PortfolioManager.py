@@ -525,3 +525,38 @@ class PortfolioManager:
         plt.title("Portfolio Diversification by Sector")
         plt.axis('equal')
         plt.show()
+    def view_financial_info(self, ticker):
+             try:
+                 ticker = ticker.upper()
+                 if ticker not in self.valid_tickers:
+                     print(f"\nNo matching ticker found for {ticker}. Here are some suggestions:")
+                     self.validate_ticker(ticker)
+                     return
+ 
+                 stock = yf.Ticker(ticker)
+                 info = stock.info
+ 
+                 asset_name = self.valid_tickers[ticker]["name"]
+                 print(f"\nFinancial Information for {asset_name} ({ticker}):")
+ 
+                 print(f"Current Market Price: ${info.get('currentPrice', 'N/A'):.2f}")
+                 print(f"Previous Close: ${info.get('previousClose', 'N/A'):.2f}")
+                 print(f"Trailing P/E Ratio: {info.get('trailingPE', 'N/A')}")
+                 print(f"Forward P/E Ratio: {info.get('forwardPE', 'N/A')}")
+                 print(f"EBITDA: ${info.get('ebitda', 'N/A'):.2f}")
+                 print(f"Book Value: ${info.get('bookValue', 'N/A'):.2f}")
+                 print(f"Market Cap: ${info.get('marketCap', 'N/A'):.2f}")
+                 print(f"52-Week Range: ${info.get('fiftyTwoWeekLow', 'N/A')} - ${info.get('fiftyTwoWeekHigh', 'N/A')}")
+                 print(f"Sector: {info.get('sector', 'N/A')}")
+                 print(f"Industry: {info.get('industry', 'N/A')}")
+ 
+                 current_price = info.get('currentPrice', 0)
+                 fifty_two_week_low = info.get('fiftyTwoWeekLow', 0)
+                 fifty_two_week_high = info.get('fiftyTwoWeekHigh', 0)
+                 if current_price and fifty_two_week_low and fifty_two_week_high:
+                     range_percent = ((current_price - fifty_two_week_low) / (fifty_two_week_high - fifty_two_week_low)) * 100
+                     print(f"Price Position in 52-Week Range: {range_percent:.1f}%")
+ 
+             except Exception as e:
+                 print(f"Error fetching financial info for {ticker}: {e}")
+ 

@@ -25,7 +25,7 @@ if __name__ == "__main__":
     portfolio_id = manager.create_portfolio(user_id, portfolio_name)
 
     while True:
-        print("\nOptions: \n1) Buy Stock   \n2) Sell/Short Sell Stock \n3) Add historical transanction\n4) Check Portfolio   \n5) Visualize Portfolio  \n6) Diversification Analysis  \n7) Export Portfolio \n8) Import Portfolio\n9) Explore Stocks\n10) Exit")
+        print("\nOptions: \n1) Buy Stock   \n2) Sell/Short Sell Stock \n3) Add historical transanction\n4) Check Portfolio   \n5) Visualize Portfolio  \n6) Diversification Analysis  \n7) View Single-Stock Financial Info\n8) Explore Stocks\n9) Import Portfolio\n10) Export Portfolio\n11) Exit")
         choice = validate_input("Enter choice: ", str)
 
         if choice == "1":
@@ -41,12 +41,15 @@ if __name__ == "__main__":
         elif choice == "6":
             manager.diversification_analysis(portfolio_id)
         elif choice == "7":
-            manager.export_portfolio(portfolio_id)
+            ticker = validate_input("Enter stock ticker: ", str)
+            manager.view_financial_info(ticker)
         elif choice == "8":
-            manager.import_portfolio(portfolio_id)
-        elif choice == "9":
             explorer.menu()
+        elif choice == "9":
+            manager.import_portfolio(portfolio_id) 
         elif choice == "10":
+            manager.export_portfolio(portfolio_id)
+        elif choice == "11":
             print("Exiting...")
             break
         else:
