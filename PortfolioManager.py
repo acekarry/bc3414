@@ -223,10 +223,6 @@ class PortfolioManager:
         return (final_value / initial_investment) ** (1 / years) - 1
 
     def portfolio_performance(self, portfolio_id, total_long_val, total_short_val, total_long_pnl, total_short_pnl):
-        """ 
-        Computes annualized return separately for long and short positions,
-        then combines them for total portfolio performance.
-        """
         try:
             # Retrieve the earliest transaction date for this portfolio.
             self.db.cursor.execute(
@@ -383,7 +379,7 @@ class PortfolioManager:
     def visualise_portfolio(self, portfolio_id):
         """
         Creates a side-by-side visualization:
-        - Left: A bar chart showing current portfolio performance.
+        - Left: Showing current portfolio performance.
         - Right: A time series chart displaying, over time, total portfolio value, net deposits, and total returns.
         """
         # ----- Left: Current Portfolio Bar Chart -----
@@ -493,10 +489,7 @@ class PortfolioManager:
         plt.show()
 
     def diversification_analysis(self, portfolio_id):
-        """
-        Analyzes diversification by computing the current value per sector.
-        Uses the 'GICS Sector' from the CSV file and displays a breakdown and pie chart.
-        """
+ 
         positions = self.db.check_portfolio(portfolio_id)
         if not positions:
             print("No transactions to analyze for diversification.")
