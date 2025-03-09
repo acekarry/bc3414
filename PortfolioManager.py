@@ -504,12 +504,13 @@ class PortfolioManager:
             if market_price is None:
                 continue
             value = market_price * data["quantity"]
-            total_value += value
+            abs_value = abs(value)  # Use absolute value for both long and short positions
+            total_value += abs_value
             if ticker in self.valid_tickers:
                 sector = self.valid_tickers[ticker].get("sector", "Unknown")
             else:
                 sector = "Unknown"
-            sector_values[sector] = sector_values.get(sector, 0) + value
+            sector_values[sector] = sector_values.get(sector, 0) + abs_value
 
         print("\nDiversification Analysis:")
         for sector, value in sector_values.items():
