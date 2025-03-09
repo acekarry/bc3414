@@ -126,7 +126,9 @@ class PortfolioManager:
                 print(f"\nStock found: {ticker} - {asset_name}")
                 print(f"Current market price: ${market_price:.2f}")
 
-                
+                print("\nAdditional financial information:")
+                self.view_financial_info(ticker)
+
                 confirm = validate_input(f"Do you want to buy {asset_name} ({ticker})? (y/n): ", str).lower()
                 if confirm == 'y':
                     # For current transactions, use today's date.
@@ -296,6 +298,9 @@ class PortfolioManager:
 
                 print(f"\nAsset found: {asset_name} ({ticker})")
                 print(f"Current market price: ${market_price:.2f}")
+
+                print("\nAdditional financial information:")
+                self.view_financial_info(ticker)
 
                 confirm = validate_input(f"Do you want to sell/short {asset_name} ({ticker})? (y/n): ", str).lower()
                 if confirm == 'y':
@@ -525,7 +530,7 @@ class PortfolioManager:
         plt.title("Portfolio Diversification by Sector")
         plt.axis('equal')
         plt.show()
-        
+
     def view_financial_info(self, ticker):
              try:
                  ticker = ticker.upper()
@@ -540,7 +545,6 @@ class PortfolioManager:
                  asset_name = self.valid_tickers[ticker]["name"]
                  print(f"\nFinancial Information for {asset_name} ({ticker}):")
  
-                 print(f"Current Market Price: ${info.get('currentPrice', 'N/A'):.2f}")
                  print(f"Previous Close: ${info.get('previousClose', 'N/A'):.2f}")
                  print(f"Trailing P/E Ratio: {info.get('trailingPE', 'N/A')}")
                  print(f"Forward P/E Ratio: {info.get('forwardPE', 'N/A')}")
