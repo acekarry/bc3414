@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}StockFolio - News Explorer{% endblock %}
+
+{% block extra_css %}
+<style>
+    .news-item {
+        transition: transform 0.2s ease;
+    }
+    .news-item:hover {
+        transform: translateY(-3px);
+    }
+    .ticker-suggestion {
+        cursor: pointer;
+        padding: 8px 10px;
+        border-bottom: 1px solid #eee;
+    }
+    .ticker-suggestion:hover {
+        background-color: #f8f9fa;
+    }
+    .ticker-suggestion:last-child {
+        border-bottom: none;
+    }
+    .suggestions-container {
+        position: absolute;
+        width: 100%;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 0 0 4px 4px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('explore') }}">Explore</a></li>
+                <li class="breadcrumb-item active">News Explorer</li>
+            </ol>
+        </nav>
+        <h2>News Explorer</h2>
+        <p class="text-muted">Get the latest news for any stock</p>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form action="{{ url_for('explore_news') }}" method="get" class="row g-3">
+            <div class="col-md-8 position-relative">
+                <label for="ticker" class="form-label">Search for a stock:</label>
+                <input type="text" class="form-control" id="ticker" name="ticker" 
+                       placeholder="Enter ticker symbol (e.g. AAPL)" value="{{ ticker }}">
+                <div id="tickerSuggestions" class="suggestions-container"></div>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-search me-1"></i>Get News
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if ticker %}
+<div class="alert alert-info mb-4">
+    <i class="fas fa-info-circle me-2"></i>Showing news for <strong>{{ ticker }}</strong>
+</div>
+{% endif %}
+
+{% if news %}
+<div class="row">
+    {% for item in news %}
+    <div class="col-md-6 mb-4">
+        <div class="card news-item h-100 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">{{ item.title }}</h5>
+                <p class="card-text text-muted small">
+                    <i class="fas fa-calendar-alt me-1"></i> {{ item.date }}
+                    <span class="ms-2"><i class="fas fa-newspaper me-1"></i> {{ item.source }}</span>
+                </p>
+            </div>
+            <div class="card-footer bg-white border-top-0">
+                <a href="{{ item.link }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                    <i class="fas fa-external-link-alt me-1"></i>Read Article
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% elif ticker %}
+<div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle me-2"></i>No news found for {{ ticker }}
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="fas fa-newspaper fa-4x mb-3 text-muted"></i>
+    <h4>Search for a stock to see the latest news</h4>
+    <p class="text-muted">Enter a ticker symbol in the search box above</p>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Ticker search autocomplete
+    const tickerInput = document.getElementById('ticker');
+    const suggestionsContainer = document.getElementById('tickerSuggestions');
+    
+    tickerInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        if (query.length < 1) {
+            suggestionsContainer.style.display = 'none';
+            return;
+        }
+        
+        fetch(`/search_ticker?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.length > 0) {
+                    suggestionsContainer.innerHTML = '';
+                    data.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'ticker-suggestion';
+                        div.innerHTML = `<strong>${item.ticker}</strong> - ${item.name}`;
+                        div.addEventListener('click', function() {
+                            tickerInput.value = item.ticker;
+                            suggestionsContainer.style.display = 'none';
+                        });
+                        suggestionsContainer.appendChild(div);
+                    });
+                    suggestionsContainer.style.display = 'block';
+                } else {
+                    suggestionsContainer.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching ticker suggestions:', error);
+                suggestionsContainer.style.display = 'none';
+            });
+    });
+    
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', function(event) {
+        if (!suggestionsContainer.contains(event.target) && event.target !== tickerInput) {
+            suggestionsContainer.style.display = 'none';
+        }
+    });
+</script>
+{% endblock %}

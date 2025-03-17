@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}StockFolio - Add Historical Transaction{% endblock %}
+
+{% block extra_css %}
+<style>
+    .ticker-suggestion {
+        cursor: pointer;
+        padding: 8px 10px;
+        border-bottom: 1px solid #eee;
+    }
+    .ticker-suggestion:hover {
+        background-color: #f8f9fa;
+    }
+    .ticker-suggestion:last-child {
+        border-bottom: none;
+    }
+    .suggestions-container {
+        position: absolute;
+        width: 100%;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 1000;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 0 0 4px 4px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                <li class="breadcrumb-item active">Add Historical Transaction</li>
+            </ol>
+        </nav>
+        
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-history me-2"></i>Add Historical Transaction</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Use this form to add past stock purchases that you made before using StockFolio.
+                </div>
+                
+                <form id="historicalForm" action="{{ url_for('historical') }}" method="post">
+                    <div class="mb-3 position-relative">
+                        <label for="ticker" class="form-label">Stock Ticker Symbol:</label>
+                        <input type="text" class="form-control" id="ticker" name="ticker" placeholder="e.g. AAPL, MSFT, GOOGL" required>
+                        <div id="tickerSuggestions" class="suggestions-container"></div>
+                        <div id="tickerInfo" class="mt-2"></div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="transaction_date" class="form-label">Purchase Date:</label>
+                        <input type="date" class="form-control" id="transaction_date" name="transaction_date" 
+                               max="{{ max_date }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="price" class="form-label">Purchase Price Per Share ($):</label>
+                        <input type="number" class="form-control" id="price" name="price" min="0.01" step="0.01" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="quantity" class="form-label">Quantity:</label>
+                        <input type="number" class="form-control" id="quantity" name="quantity" min="0.01" step="0.01" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="confirm" required>
+                            <label class="form-check-label" for="confirm">
+                                I confirm this historical transaction
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-check-circle me-1"></i>Add Historical Transaction
+                    </button>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary ms-2">
+                        <i class="fas fa-times-circle me-1"></i>Cancel
+                    </a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Ticker search autocomplete
+    const tickerInput = document.getElementById('ticker');
+    const suggestionsContainer = document.getElementById('tickerSuggestions');
+    const tickerInfo = document.getElementById('tickerInfo');
+    
+    tickerInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        if (query.length < 1) {
+            suggestionsContainer.style.display = 'none';
+            tickerInfo.innerHTML = '';
+            return;
+        }
+        
+        fetch(`/search_ticker?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.length > 0) {
+                    suggestionsContainer.innerHTML = '';
+                    data.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'ticker-suggestion';
+                        div.innerHTML = `<strong>${item.ticker}</strong> - ${item.name}`;
+                        div.addEventListener('click', function() {
+                            tickerInput.value = item.ticker;
+                            suggestionsContainer.style.display = 'none';
+                            tickerInfo.innerHTML = `
+                                <div class="alert alert-info">
+                                    <strong>${item.ticker}</strong> - ${item.name}
+                                </div>
+                            `;
+                        });
+                        suggestionsContainer.appendChild(div);
+                    });
+                    suggestionsContainer.style.display = 'block';
+                } else {
+                    suggestionsContainer.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching ticker suggestions:', error);
+                suggestionsContainer.style.display = 'none';
+            });
+    });
+    
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', function(event) {
+        if (!suggestionsContainer.contains(event.target) && event.target !== tickerInput) {
+            suggestionsContainer.style.display = 'none';
+        }
+    });
+    
+    // Form validation
+    document.getElementById('historicalForm').addEventListener('submit', function(event) {
+        const ticker = tickerInput.value.trim();
+        const date = document.getElementById('transaction_date').value;
+        const price = document.getElementById('price').value;
+        const quantity = document.getElementById('quantity').value;
+        
+        if (!ticker) {
+            event.preventDefault();
+            alert('Please enter a valid ticker symbol');
+            return;
+        }
+        
+        if (!date) {
+            event.preventDefault();
+            alert('Please select a transaction date');
+            return;
+        }
+        
+        if (price <= 0) {
+            event.preventDefault();
+            alert('Price must be greater than 0');
+            return;
+        }
+        
+        if (quantity <= 0) {
+            event.preventDefault();
+            alert('Quantity must be greater than 0');
+            return;
+        }
+    });
+</script>
+{% endblock %}

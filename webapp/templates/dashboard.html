@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block title %}StockFolio - Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .performance-card {
+        transition: transform 0.3s ease;
+    }
+    .performance-card:hover {
+        transform: translateY(-5px);
+    }
+    .table-responsive {
+        overflow-x: auto;
+    }
+    .positive {
+        color: #28a745;
+    }
+    .negative {
+        color: #dc3545;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h2>Portfolio Dashboard</h2>
+        <p class="text-muted">Welcome back, {{ name }}</p>
+    </div>
+    <div class="col-md-6 text-md-end">
+        <a href="{{ url_for('buy') }}" class="btn btn-success me-2">
+            <i class="fas fa-shopping-cart me-1"></i>Buy
+        </a>
+        <a href="{{ url_for('sell') }}" class="btn btn-danger">
+            <i class="fas fa-exchange-alt me-1"></i>Sell
+        </a>
+    </div>
+</div>
+
+<!-- Performance Overview Cards -->
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card performance-card shadow-sm h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Total Value</h5>
+                <h3 class="mb-0">${{ '%.2f'|format(total_value) }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card performance-card shadow-sm h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Total P&L</h5>
+                <h3 class="mb-0 {% if total_pnl >= 0 %}positive{% else %}negative{% endif %}">
+                    ${{ '%.2f'|format(total_pnl) }}
+                </h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card performance-card shadow-sm h-100">
+            <div class="card-body text-center">
+                <h5 class="card-title text-muted">Total P&L %</h5>
+                <h3 class="mb-0 {% if total_pnl_percent >= 0 %}positive{% else %}negative{% endif %}">
+                    {{ '%.2f'|format(total_pnl_percent) }}%
+                </h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-lg-8 mb-4">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h5 class="mb-0">Portfolio Performance</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="performanceChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Sector Allocation</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="sectorChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Holdings Table -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Current Holdings</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Ticker</th>
+                        <th>Name</th>
+                        <th>Type</th>
+                        <th>Quantity</th>
+                        <th>Avg Price</th>
+                        <th>Market Price</th>
+                        <th>Current Value</th>
+                        <th>P&L</th>
+                        <th>P&L %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if portfolio_data %}
+                        {% for item in portfolio_data %}
+                        <tr>
+                            <td><strong>{{ item.ticker }}</strong></td>
+                            <td>{{ item.name }}</td>
+                            <td>{{ item.position_type }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>${{ '%.2f'|format(item.avg_price) }}</td>
+                            <td>${{ '%.2f'|format(item.market_price) }}</td>
+                            <td>${{ '%.2f'|format(item.current_value) }}</td>
+                            <td class="{% if item.pnl >= 0 %}positive{% else %}negative{% endif %}">
+                                ${{ '%.2f'|format(item.pnl) }}
+                            </td>
+                            <td class="{% if item.pnl_percent >= 0 %}positive{% else %}negative{% endif %}">
+                                {{ '%.2f'|format(item.pnl_percent) }}%
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center py-4">
+                                <p class="mb-0">No holdings in your portfolio.</p>
+                                <a href="{{ url_for('buy') }}" class="btn btn-sm btn-primary mt-2">
+                                    <i class="fas fa-shopping-cart me-1"></i>Buy your first stock
+                                </a>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Performance chart
+    const performanceData = {{ performance_data|safe }};
+    if (performanceData && performanceData.length > 0) {
+        const ctx = document.getElementById('performanceChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: performanceData.map(d => d.date),
+                datasets: [
+                    {
+                        label: 'Portfolio Value',
+                        data: performanceData.map(d => d.value),
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.1
+                    },
+                    {
+                        label: 'Net Deposits',
+                        data: performanceData.map(d => d.deposits),
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        fill: false,
+                        tension: 0.1
+                    },
+                    {
+                        label: 'Total Returns',
+                        data: performanceData.map(d => d.returns),
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: false
+                    }
+                },
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': $' + context.raw.toFixed(2);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Sector allocation chart
+    const sectorData = {{ sector_data|safe }};
+    if (sectorData && sectorData.length > 0) {
+        const ctx = document.getElementById('sectorChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: sectorData.map(d => d.sector),
+                datasets: [{
+                    data: sectorData.map(d => d.value),
+                    backgroundColor: [
+                        'rgba(255, 99, 132, 0.7)',
+                        'rgba(54, 162, 235, 0.7)',
+                        'rgba(255, 206, 86, 0.7)',
+                        'rgba(75, 192, 192, 0.7)',
+                        'rgba(153, 102, 255, 0.7)',
+                        'rgba(255, 159, 64, 0.7)',
+                        'rgba(199, 199, 199, 0.7)',
+                        'rgba(83, 102, 255, 0.7)',
+                        'rgba(40, 159, 64, 0.7)',
+                        '   rgba(210, 99, 132, 0.7)',
+                        'rgba(54, 72, 235, 0.7)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            boxWidth: 12
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.raw;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${context.label}: $${value.toFixed(2)} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}
