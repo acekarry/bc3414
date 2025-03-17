@@ -20,15 +20,16 @@ portfolio_manager = PortfolioManager()
 stock_explorer = StockExplorer()
 news_scraper = NewsScraper()
 
-# Handle database connection teardown
-
-
+# Teardown the per-request database connection
 @app.teardown_appcontext
 def close_connection(exception):
-    db = getattr(g, 'sqlite_db', None)
+    db = g.pop('db', None)
     if db is not None:
         db.close()
 
+# -------------------------
+# Routes
+# -------------------------
 
 @app.route('/')
 def index():
@@ -36,11 +37,10 @@ def index():
         return redirect(url_for('dashboard'))
     return render_template('index.html')
 
-
 @app.route('/login', methods=['POST'])
 def login():
     name = request.form.get('name', '').strip().lower()
-
+    
     # Basic validation
     if not name:
         flash('Name cannot be empty', 'error')
@@ -52,16 +52,18 @@ def login():
         flash('Name can only contain letters and spaces', 'error')
         return redirect(url_for('index'))
 
-    # Login or register user
-    user_id = portfolio_manager.login(name) or portfolio_manager.register(name)
-    if user_id:
-        session['user_id'] = user_id
-        session['name'] = name
+    # Login or register user using updated methods (returning a Person object)
+    user = portfolio_manager.login(name)
+    if not user:
+        user = portfolio_manager.register(name)
+    
+    if user:
+        session['user_id'] = user.user_id
+        session['name'] = user.name
 
         # Create portfolio if needed
-        portfolio_name = f"{name}'s Portfolio"
-        portfolio_id = portfolio_manager.create_portfolio(
-            user_id, portfolio_name)
+        portfolio_name = f"{user.name}'s Portfolio"
+        portfolio_id = portfolio_manager.create_portfolio(user.user_id, portfolio_name)
         session['portfolio_id'] = portfolio_id
 
         return redirect(url_for('dashboard'))
@@ -69,12 +71,10 @@ def login():
     flash('Error logging in', 'error')
     return redirect(url_for('index'))
 
-
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('index'))
-
 
 @app.route('/dashboard')
 def dashboard():
@@ -109,9 +109,7 @@ def dashboard():
             pnl = (avg_price - market_price) * abs(quantity)
             position_type = "Short"
 
-        # Calculate percent change
-        pnl_percent = (pnl / abs(current_value)) * \
-            100 if current_value != 0 else 0
+        pnl_percent = (pnl / abs(current_value)) * 100 if current_value != 0 else 0
 
         portfolio_data.append({
             'ticker': ticker,
@@ -129,155 +127,20 @@ def dashboard():
         total_cost += data["total_cost"]
 
     total_pnl = total_value - total_cost
-    total_pnl_percent = (total_pnl / abs(total_value)) * \
-        100 if total_value != 0 else 0
+    total_pnl_percent = (total_pnl / abs(total_value)) * 100 if total_value != 0 else 0
 
-    # Get performance data for charts
-    performance_data = get_portfolio_performance_data(portfolio_id)
-
-    # Get sector data for pie chart
-    sector_data = get_portfolio_sector_data(portfolio_id)
+    # Get performance and sector data for charts
+    performance_data = json.dumps(get_portfolio_performance_data(portfolio_id))
+    sector_data = json.dumps(get_portfolio_sector_data(portfolio_id))
 
     return render_template('dashboard.html',
                            portfolio_data=portfolio_data,
                            total_value=float(total_value),
                            total_pnl=float(total_pnl),
                            total_pnl_percent=float(total_pnl_percent),
-                           performance_data=json.dumps(performance_data),
-                           sector_data=json.dumps(sector_data),
+                           performance_data=performance_data,
+                           sector_data=sector_data,
                            name=session.get('name', 'User'))
-
-
-def get_portfolio_sector_data(portfolio_id):
-    """Get portfolio sector allocation data for pie chart"""
-    positions = db_manager.check_portfolio(portfolio_id)
-    sector_values = {}
-
-    for ticker, data in positions.items():
-        if data["quantity"] == 0:
-            continue
-
-        market_price = portfolio_manager.get_price(ticker)
-        if market_price is None:
-            continue
-
-        value = market_price * data["quantity"]
-
-        # Get sector for this ticker
-        valid_tickers = portfolio_manager.valid_tickers
-        if ticker in valid_tickers:
-            sector = valid_tickers[ticker].get("sector", "Unknown")
-        else:
-            sector = "Unknown"
-
-        # Update sector value
-        sector_values[sector] = sector_values.get(sector, 0) + value
-
-    # Format for chart - ensure all values are basic Python types
-    sector_data = [{'sector': str(sector), 'value': float(
-        round(value, 2))} for sector, value in sector_values.items()]
-    return sector_data
-def get_portfolio_performance_data(portfolio_id):
-    """Get portfolio performance data over time for charts"""
-    # Fetch all transactions
-    cursor = db_manager.get_cursor()
-    cursor.execute(
-        "SELECT transaction_date, ticker, price, quantity FROM transactions WHERE portfolio_id = ? ORDER BY transaction_date, id",
-        (portfolio_id,)
-    )
-    transactions = cursor.fetchall()
-    if not transactions:
-        return []
-
-    # Parse transaction dates
-    transactions_parsed = []
-    for t in transactions:
-        trans_date = datetime.strptime(t[0], "%Y-%m-%d").date()
-        transactions_parsed.append((trans_date, t[1], t[2], t[3]))
-
-    # Determine date range
-    start_date = min(t[0] for t in transactions_parsed)
-    end_date = date.today()
-
-    # Generate dates for the chart (monthly intervals for better performance)
-    current_date = start_date
-    chart_dates = []
-    while current_date <= end_date:
-        chart_dates.append(current_date)
-        # Move to next month
-        if current_date.month == 12:
-            current_date = date(current_date.year + 1, 1, 1)
-        else:
-            current_date = date(current_date.year, current_date.month + 1, 1)
-
-    # Add the current date if it's not already included
-    if chart_dates[-1] != end_date:
-        chart_dates.append(end_date)
-
-    # Fetch historical price data for all tickers involved
-    tickers_involved = set(t[1] for t in transactions_parsed)
-    ticker_data = {}
-    for ticker in tickers_involved:
-        try:
-            # Use yfinance to get historical data
-            start_str = start_date.strftime("%Y-%m-%d")
-            end_str = (end_date + timedelta(days=1)).strftime("%Y-%m-%d")
-            stock_data = yf.download(ticker, start=start_str, end=end_str)
-            if not stock_data.empty:
-                ticker_data[ticker] = stock_data
-        except Exception as e:
-            print(f"Error fetching data for {ticker}: {e}")
-
-    # Calculate portfolio value for each date
-    performance_data = []
-    for current_date in chart_dates:
-        # Calculate positions as of this date
-        positions = {}
-        net_deposits = 0.0
-
-        for trans in transactions_parsed:
-            if trans[0] <= current_date:
-                ticker = trans[1]
-                price = trans[2]
-                quantity = trans[3]
-
-                # Track deposits
-                net_deposits += price * quantity
-
-                # Update positions
-                positions[ticker] = positions.get(ticker, 0) + quantity
-
-        # Calculate portfolio value
-        portfolio_value = 0.0
-        for ticker, quantity in positions.items():
-            if quantity == 0:
-                continue
-
-            if ticker in ticker_data:
-                # Get price on or before the current date
-                price_data = ticker_data[ticker]
-                if not price_data.empty:
-                    # Find the closest date before or on the current date
-                    closest_dates = price_data.index[price_data.index <= pd.Timestamp(
-                        current_date)]
-                    if len(closest_dates) > 0:
-                        closest_date = closest_dates[-1]
-                        # Convert pandas Series to float
-                        price = float(price_data.loc[closest_date, 'Close'])
-                        portfolio_value += price * quantity
-
-        # Calculate returns
-        total_return = portfolio_value - net_deposits
-
-        # Add data point - ensure all values are basic Python types
-        performance_data.append({
-            'date': current_date.strftime("%Y-%m-%d"),
-            'value': float(round(portfolio_value, 2)),
-            'deposits': float(round(net_deposits, 2)),
-            'returns': float(round(total_return, 2))
-        })
-
-    return performance_data
 
 @app.route('/buy', methods=['GET', 'POST'])
 def buy():
@@ -298,7 +161,6 @@ def buy():
             flash('Invalid quantity', 'error')
             return redirect(url_for('buy'))
 
-        # Validate ticker
         valid_tickers = portfolio_manager.valid_tickers
         if ticker not in valid_tickers:
             flash(f'Invalid ticker: {ticker}', 'error')
@@ -306,13 +168,11 @@ def buy():
 
         asset_name = valid_tickers[ticker]["name"]
         market_price = portfolio_manager.get_price(ticker)
-
         if market_price is None:
             flash(f'Could not retrieve market price for {ticker}', 'error')
             return redirect(url_for('buy'))
 
         transaction_date = str(date.today())
-
         if order_type == 'limit':
             limit_price = request.form.get('limit_price', 0)
             try:
@@ -324,22 +184,18 @@ def buy():
             except ValueError:
                 flash('Invalid limit price', 'error')
                 return redirect(url_for('buy'))
-        else:  # market order
+        else:
             price = market_price
             limit_price = None
 
-        # Execute the transaction
         portfolio_id = session.get('portfolio_id')
         db_manager.insert_transaction(portfolio_id, ticker, asset_name, transaction_date,
                                       order_type, price, quantity, limit_price)
 
-        flash(
-            f'Successfully purchased {quantity} shares of {ticker} at ${price:.2f}', 'success')
+        flash(f'Successfully purchased {quantity} shares of {ticker} at ${price:.2f}', 'success')
         return redirect(url_for('dashboard'))
 
-    # GET request - serve the buy form
     return render_template('buy.html', name=session.get('name', 'User'))
-
 
 @app.route('/sell', methods=['GET', 'POST'])
 def sell():
@@ -360,7 +216,6 @@ def sell():
             flash('Invalid quantity', 'error')
             return redirect(url_for('sell'))
 
-        # Validate ticker
         valid_tickers = portfolio_manager.valid_tickers
         if ticker not in valid_tickers:
             flash(f'Invalid ticker: {ticker}', 'error')
@@ -368,13 +223,11 @@ def sell():
 
         asset_name = valid_tickers[ticker]["name"]
         market_price = portfolio_manager.get_price(ticker)
-
         if market_price is None:
             flash(f'Could not retrieve market price for {ticker}', 'error')
             return redirect(url_for('sell'))
 
         transaction_date = str(date.today())
-
         if order_type == 'limit':
             limit_price = request.form.get('limit_price', 0)
             try:
@@ -386,22 +239,18 @@ def sell():
             except ValueError:
                 flash('Invalid limit price', 'error')
                 return redirect(url_for('sell'))
-        else:  # market order
+        else:
             price = market_price
             limit_price = None
 
-        # Execute the transaction (negative quantity for selling)
         portfolio_id = session.get('portfolio_id')
         db_manager.insert_transaction(portfolio_id, ticker, asset_name, transaction_date,
                                       order_type, price, -quantity, limit_price)
 
-        flash(
-            f'Successfully sold {quantity} shares of {ticker} at ${price:.2f}', 'success')
+        flash(f'Successfully sold {quantity} shares of {ticker} at ${price:.2f}', 'success')
         return redirect(url_for('dashboard'))
 
-    # GET request - serve the sell form
     return render_template('sell.html', name=session.get('name', 'User'))
-
 
 @app.route('/historical', methods=['GET', 'POST'])
 def historical():
@@ -432,7 +281,6 @@ def historical():
             flash('Invalid price', 'error')
             return redirect(url_for('historical'))
 
-        # Validate date
         try:
             datetime.strptime(transaction_date, '%Y-%m-%d')
             if transaction_date > str(date.today()):
@@ -442,33 +290,25 @@ def historical():
             flash('Invalid date format. Use YYYY-MM-DD', 'error')
             return redirect(url_for('historical'))
 
-        # Validate ticker
         valid_tickers = portfolio_manager.valid_tickers
         if ticker not in valid_tickers:
             flash(f'Invalid ticker: {ticker}', 'error')
             return redirect(url_for('historical'))
 
         asset_name = valid_tickers[ticker]["name"]
-
-        # Execute the transaction
         portfolio_id = session.get('portfolio_id')
         db_manager.insert_transaction(portfolio_id, ticker, asset_name, transaction_date,
                                       'historical', price, quantity, None)
 
-        flash(
-            f'Successfully recorded historical purchase of {quantity} shares of {ticker} at ${price:.2f} on {transaction_date}', 'success')
+        flash(f'Successfully recorded historical purchase of {quantity} shares of {ticker} at ${price:.2f} on {transaction_date}', 'success')
         return redirect(url_for('dashboard'))
 
-    # GET request - serve the historical form
-    return render_template('historical.html',
-                           max_date=date.today().strftime('%Y-%m-%d'),
+    return render_template('historical.html', max_date=date.today().strftime('%Y-%m-%d'),
                            name=session.get('name', 'User'))
-
 
 @app.route('/search_ticker', methods=['GET'])
 def search_ticker():
     query = request.args.get('q', '').upper()
-
     if not query:
         return jsonify([])
 
@@ -481,25 +321,21 @@ def search_ticker():
         if ticker.startswith(query)
     ]
 
-    # Fuzzy matches (company names that contain the query)
+    # Fuzzy matches (company names containing the query)
     fuzzy_matches = [
         {'ticker': ticker, 'name': data['name']}
         for ticker, data in valid_tickers.items()
         if query.lower() in data['name'].lower() and not ticker.startswith(query)
     ]
 
-    # Combine and limit results
     results = direct_matches + fuzzy_matches
     return jsonify(results[:10])  # Limit to 10 results
-
 
 @app.route('/explore')
 def explore():
     if 'user_id' not in session:
         return redirect(url_for('index'))
-
     return render_template('explore.html', name=session.get('name', 'User'))
-
 
 @app.route('/explore/news', methods=['GET', 'POST'])
 def explore_news():
@@ -514,52 +350,43 @@ def explore_news():
         if ticker in valid_tickers:
             asset_name = valid_tickers[ticker]["name"]
 
-            # Get news using GoogleNews (adapted from NewsScraper class)
+            # Get news using GoogleNews
             from GoogleNews import GoogleNews
             googlenews = GoogleNews(lang='en', region='US')
             googlenews.clear()
             googlenews.search(asset_name)
             results = googlenews.results()
-
             if results:
                 news = [{
                     'title': item['title'],
                     'link': item['link'],
                     'date': item.get('date', 'N/A'),
                     'source': item.get('media', 'Unknown')
-                } for item in results[:10]]  # Limit to 10 news items
-
-    return render_template('explore_news.html', news=news, ticker=ticker, name=session.get('name', 'User'))
-
+                } for item in results[:10]]
+    return render_template('explore_news.html', news=news, ticker=ticker,
+                           name=session.get('name', 'User'))
 
 @app.route('/explore/filter', methods=['GET', 'POST'])
 def explore_filter():
     if 'user_id' not in session:
         return redirect(url_for('index'))
 
-    sector_df = pd.read_csv("SnP_tickers_sector.csv").drop(
-        columns=["Headquarters Location"])
-
-    # Get unique sectors and industries
+    sector_df = pd.read_csv("SnP_tickers_sector.csv").drop(columns=["Headquarters Location"])
     sectors = sorted(sector_df["GICS Sector"].dropna().unique())
     industries = sorted(sector_df["GICS Sub-Industry"].dropna().unique())
 
     filter_type = request.args.get('filter_type', '')
     filter_value = request.args.get('filter_value', '')
-
     results = []
     selected_ticker = request.args.get('ticker', '')
     ticker_metrics = {}
 
     if filter_type and filter_value:
         column = "GICS Sector" if filter_type == "sector" else "GICS Sub-Industry" if filter_type == "industry" else "Security"
-        filtered = sector_df[sector_df[column].str.contains(
-            filter_value, case=False, na=False)]
-
+        filtered = sector_df[sector_df[column].str.contains(filter_value, case=False, na=False)]
         if not filtered.empty:
             results = filtered.to_dict('records')
 
-    # If a specific ticker is selected, fetch additional metrics
     if selected_ticker:
         try:
             ticker_obj = yf.Ticker(selected_ticker)
@@ -586,12 +413,16 @@ def explore_filter():
                            ticker_metrics=ticker_metrics,
                            name=session.get('name', 'User'))
 
-# Helper functions for charts and data analysis
-
+# -------------------------
+# Helper Functions
+# -------------------------
 
 def get_portfolio_performance_data(portfolio_id):
-    """Get portfolio performance data over time for charts"""
-    # Fetch all transactions
+    """
+    Get portfolio performance data over time for charts.
+    This function aggregates transaction data, fetches historical prices via yfinance,
+    and computes portfolio value, net deposits, and returns at monthly intervals.
+    """
     cursor = db_manager.get_cursor()
     cursor.execute(
         "SELECT transaction_date, ticker, price, quantity FROM transactions WHERE portfolio_id = ? ORDER BY transaction_date, id",
@@ -601,37 +432,32 @@ def get_portfolio_performance_data(portfolio_id):
     if not transactions:
         return []
 
-    # Parse transaction dates
+    # Parse transactions
     transactions_parsed = []
     for t in transactions:
         trans_date = datetime.strptime(t[0], "%Y-%m-%d").date()
         transactions_parsed.append((trans_date, t[1], t[2], t[3]))
 
-    # Determine date range
     start_date = min(t[0] for t in transactions_parsed)
     end_date = date.today()
 
-    # Generate dates for the chart (monthly intervals for better performance)
+    # Generate monthly dates for the chart
     current_date = start_date
     chart_dates = []
     while current_date <= end_date:
         chart_dates.append(current_date)
-        # Move to next month
         if current_date.month == 12:
             current_date = date(current_date.year + 1, 1, 1)
         else:
             current_date = date(current_date.year, current_date.month + 1, 1)
-
-    # Add the current date if it's not already included
     if chart_dates[-1] != end_date:
         chart_dates.append(end_date)
 
-    # Fetch historical price data for all tickers involved
+    # Fetch historical price data for all involved tickers
     tickers_involved = set(t[1] for t in transactions_parsed)
     ticker_data = {}
     for ticker in tickers_involved:
         try:
-            # Use yfinance to get historical data
             start_str = start_date.strftime("%Y-%m-%d")
             end_str = (end_date + timedelta(days=1)).strftime("%Y-%m-%d")
             stock_data = yf.download(ticker, start=start_str, end=end_str)
@@ -640,150 +466,32 @@ def get_portfolio_performance_data(portfolio_id):
         except Exception as e:
             print(f"Error fetching data for {ticker}: {e}")
 
-    # Calculate portfolio value for each date
     performance_data = []
     for current_date in chart_dates:
-        # Calculate positions as of this date
         positions = {}
         net_deposits = 0.0
 
+        # Aggregate transactions up to the current date
         for trans in transactions_parsed:
             if trans[0] <= current_date:
                 ticker = trans[1]
                 price = trans[2]
                 quantity = trans[3]
-
-                # Track deposits
                 net_deposits += price * quantity
-
-                # Update positions
                 positions[ticker] = positions.get(ticker, 0) + quantity
 
-        # Calculate portfolio value
         portfolio_value = 0.0
         for ticker, quantity in positions.items():
-            if quantity == 0:
+            if quantity == 0 or ticker not in ticker_data:
                 continue
+            price_data = ticker_data[ticker]
+            closest_dates = price_data.index[price_data.index <= pd.Timestamp(current_date)]
+            if len(closest_dates) > 0:
+                closest_date = closest_dates[-1]
+                price = float(price_data.loc[closest_date, 'Close'])
+                portfolio_value += price * quantity
 
-            if ticker in ticker_data:
-                # Get price on or before the current date
-                price_data = ticker_data[ticker]
-                if not price_data.empty:
-                    # Find the closest date before or on the current date
-                    closest_date = price_data.index[price_data.index <= pd.Timestamp(
-                        current_date)]
-                    if len(closest_date) > 0:
-                        closest_date = closest_date[-1]
-                        price = price_data.loc[closest_date, 'Close']
-                        portfolio_value += price * quantity
-
-        # Calculate returns
         total_return = portfolio_value - net_deposits
-
-        # Add data point
-        performance_data.append({
-            'date': current_date.strftime("%Y-%m-%d"),
-            'value': round(portfolio_value, 2),
-            'deposits': round(net_deposits, 2),
-            'returns': round(total_return, 2)
-        })
-
-    return performance_data
-
-
-def get_portfolio_performance_data(portfolio_id):
-    """Get portfolio performance data over time for charts"""
-    # Fetch all transactions
-    cursor = db_manager.get_cursor()
-    cursor.execute(
-        "SELECT transaction_date, ticker, price, quantity FROM transactions WHERE portfolio_id = ? ORDER BY transaction_date, id",
-        (portfolio_id,)
-    )
-    transactions = cursor.fetchall()
-    if not transactions:
-        return []
-
-    # Parse transaction dates
-    transactions_parsed = []
-    for t in transactions:
-        trans_date = datetime.strptime(t[0], "%Y-%m-%d").date()
-        transactions_parsed.append((trans_date, t[1], t[2], t[3]))
-
-    # Determine date range
-    start_date = min(t[0] for t in transactions_parsed)
-    end_date = date.today()
-
-    # Generate dates for the chart (monthly intervals for better performance)
-    current_date = start_date
-    chart_dates = []
-    while current_date <= end_date:
-        chart_dates.append(current_date)
-        # Move to next month
-        if current_date.month == 12:
-            current_date = date(current_date.year + 1, 1, 1)
-        else:
-            current_date = date(current_date.year, current_date.month + 1, 1)
-
-    # Add the current date if it's not already included
-    if chart_dates[-1] != end_date:
-        chart_dates.append(end_date)
-
-    # Fetch historical price data for all tickers involved
-    tickers_involved = set(t[1] for t in transactions_parsed)
-    ticker_data = {}
-    for ticker in tickers_involved:
-        try:
-            # Use yfinance to get historical data
-            start_str = start_date.strftime("%Y-%m-%d")
-            end_str = (end_date + timedelta(days=1)).strftime("%Y-%m-%d")
-            stock_data = yf.download(ticker, start=start_str, end=end_str)
-            if not stock_data.empty:
-                ticker_data[ticker] = stock_data
-        except Exception as e:
-            print(f"Error fetching data for {ticker}: {e}")
-
-    # Calculate portfolio value for each date
-    performance_data = []
-    for current_date in chart_dates:
-        # Calculate positions as of this date
-        positions = {}
-        net_deposits = 0.0
-
-        for trans in transactions_parsed:
-            if trans[0] <= current_date:
-                ticker = trans[1]
-                price = trans[2]
-                quantity = trans[3]
-
-                # Track deposits
-                net_deposits += price * quantity
-
-                # Update positions
-                positions[ticker] = positions.get(ticker, 0) + quantity
-
-        # Calculate portfolio value
-        portfolio_value = 0.0
-        for ticker, quantity in positions.items():
-            if quantity == 0:
-                continue
-
-            if ticker in ticker_data:
-                # Get price on or before the current date
-                price_data = ticker_data[ticker]
-                if not price_data.empty:
-                    # Find the closest date before or on the current date
-                    closest_dates = price_data.index[price_data.index <= pd.Timestamp(
-                        current_date)]
-                    if len(closest_dates) > 0:
-                        closest_date = closest_dates[-1]
-                        # Convert pandas Series to float
-                        price = float(price_data.loc[closest_date, 'Close'])
-                        portfolio_value += price * quantity
-
-        # Calculate returns
-        total_return = portfolio_value - net_deposits
-
-        # Add data point - ensure all values are basic Python types
         performance_data.append({
             'date': current_date.strftime("%Y-%m-%d"),
             'value': float(round(portfolio_value, 2)),
@@ -793,32 +501,53 @@ def get_portfolio_performance_data(portfolio_id):
 
     return performance_data
 
+def get_portfolio_sector_data(portfolio_id):
+    """
+    Get portfolio sector allocation data for a pie chart.
+    This function aggregates transactions to calculate the total value per sector.
+    """
+    positions = db_manager.check_portfolio(portfolio_id)
+    sector_values = {}
+    for ticker, data in positions.items():
+        if data["quantity"] == 0:
+            continue
+        market_price = portfolio_manager.get_price(ticker)
+        if market_price is None:
+            continue
+        value = market_price * data["quantity"]
+        valid_tickers = portfolio_manager.valid_tickers
+        if ticker in valid_tickers:
+            sector = valid_tickers[ticker].get("sector", "Unknown")
+        else:
+            sector = "Unknown"
+        sector_values[sector] = sector_values.get(sector, 0) + value
+    sector_data = [{'sector': str(sector), 'value': float(round(value, 2))} for sector, value in sector_values.items()]
+    return sector_data
 
 def convert_to_serializable(obj):
-    """Convert pandas and numpy types to JSON serializable Python types"""
+    """
+    Convert pandas, numpy, or datetime objects to JSON serializable types.
+    """
     import pandas as pd
     import numpy as np
 
-    # Handle pandas Series
     if isinstance(obj, pd.Series):
         return obj.to_dict()
-    # Handle pandas DataFrame
     elif isinstance(obj, pd.DataFrame):
         return obj.to_dict(orient='records')
-    # Handle numpy arrays
     elif isinstance(obj, np.ndarray):
         return obj.tolist()
-    # Handle numpy numeric types
     elif isinstance(obj, (np.int64, np.int32, np.int16, np.int8)):
         return int(obj)
     elif isinstance(obj, (np.float64, np.float32, np.float16)):
         return float(obj)
-    # Handle other types that might need conversion
-    elif hasattr(obj, 'isoformat'):  # datetime objects
+    elif hasattr(obj, 'isoformat'):  # For datetime objects
         return obj.isoformat()
     else:
         return obj
-    
 
+# -------------------------
+# Run the App
+# -------------------------
 if __name__ == '__main__':
     app.run(debug=True)
