@@ -366,43 +366,133 @@ def explore_news():
     return render_template('explore_news.html', news=news, ticker=ticker,
                            name=session.get('name', 'User'))
 
+
 @app.route('/explore/filter', methods=['GET', 'POST'])
 def explore_filter():
+    """
+    Filter and explore stocks by sector, industry, or company name.
+    
+    This route handles filtering of stock data based on user selection.
+    It loads sector/industry data from CSV, processes filter parameters,
+    and returns filtered results along with additional stock metrics
+    when a specific stock is selected.
+    """
+    # Check if user is logged in
     if 'user_id' not in session:
         return redirect(url_for('index'))
 
-    sector_df = pd.read_csv("SnP_tickers_sector.csv").drop(columns=["Headquarters Location"])
-    sectors = sorted(sector_df["GICS Sector"].dropna().unique())
-    industries = sorted(sector_df["GICS Sub-Industry"].dropna().unique())
+    try:
+        # Load and prepare data
+        sector_df = pd.read_csv("SnP_tickers_sector.csv")
 
-    filter_type = request.args.get('filter_type', '')
-    filter_value = request.args.get('filter_value', '')
-    results = []
-    selected_ticker = request.args.get('ticker', '')
-    ticker_metrics = {}
+        # Detect and handle column names with or without asterisks
+        columns = sector_df.columns.tolist()
+        sector_col = next(
+            (col for col in columns if col.endswith('GICS Sector')), 'GICS Sector')
+        industry_col = next((col for col in columns if col.endswith(
+            'GICS Sub-Industry')), 'GICS Sub-Industry')
 
-    if filter_type and filter_value:
-        column = "GICS Sector" if filter_type == "sector" else "GICS Sub-Industry" if filter_type == "industry" else "Security"
-        filtered = sector_df[sector_df[column].str.contains(filter_value, case=False, na=False)]
-        if not filtered.empty:
-            results = filtered.to_dict('records')
+        # Remove location column if present (with or without asterisk)
+        location_cols = [
+            col for col in columns if 'Headquarters Location' in col]
+        if location_cols:
+            sector_df = sector_df.drop(columns=location_cols)
 
-    if selected_ticker:
-        try:
-            ticker_obj = yf.Ticker(selected_ticker)
-            info = ticker_obj.info
-            ticker_metrics = {
-                "name": info.get("shortName", "N/A"),
-                "market_cap": info.get("marketCap", "N/A"),
-                "pe_ratio": info.get("trailingPE", "N/A"),
-                "price": info.get("regularMarketPrice", "N/A"),
-                "dividend_yield": info.get("dividendYield", "N/A"),
-                "52w_high": info.get("fiftyTwoWeekHigh", "N/A"),
-                "52w_low": info.get("fiftyTwoWeekLow", "N/A")
-            }
-        except Exception as e:
-            ticker_metrics = {"error": str(e)}
+        # Get unique values for dropdowns
+        sectors = sorted(sector_df[sector_col].dropna().unique())
+        industries = sorted(sector_df[industry_col].dropna().unique())
 
+        # Process filter parameters
+        filter_type = request.args.get('filter_type', 'sector')
+        filter_value = request.args.get('filter_value', '')
+        selected_ticker = request.args.get('ticker', '')
+
+        # Log the request parameters for debugging
+        app.logger.info(
+            f"Filter request - Type: {filter_type}, Value: {filter_value}, Ticker: {selected_ticker}")
+
+        results = []
+        ticker_metrics = {}
+
+        # Apply filtering based on filter type and value
+        if filter_type and filter_value:
+            if filter_type == "sector":
+                # Filter by sector
+                filtered = sector_df[sector_df[sector_col].str.contains(
+                    filter_value, case=False, na=False)]
+                if not filtered.empty:
+                    results = filtered.to_dict('records')
+                    app.logger.info(
+                        f"Found {len(results)} results for sector: {filter_value}")
+
+            elif filter_type == "industry":
+                # Filter by industry
+                filtered = sector_df[sector_df[industry_col].str.contains(
+                    filter_value, case=False, na=False)]
+                if not filtered.empty:
+                    results = filtered.to_dict('records')
+                    app.logger.info(
+                        f"Found {len(results)} results for industry: {filter_value}")
+
+            elif filter_type == "name":
+                # Filter by company name or symbol - try both columns
+                name_filtered = sector_df[sector_df["Security"].str.contains(
+                    filter_value, case=False, na=False)]
+
+                symbol_filtered = sector_df[sector_df["Symbol"].str.contains(
+                    filter_value, case=False, na=False)]
+
+                # Combine results and remove duplicates
+                filtered = pd.concat(
+                    [name_filtered, symbol_filtered]).drop_duplicates()
+
+                if not filtered.empty:
+                    results = filtered.to_dict('records')
+                    app.logger.info(
+                        f"Found {len(results)} results for name/symbol: {filter_value}")
+                else:
+                    app.logger.info(
+                        f"No results found for name/symbol: {filter_value}")
+
+        # If specific ticker is selected, fetch additional metrics
+        if selected_ticker:
+            # If we don't have the ticker in results, look it up directly
+            if not results:
+                ticker_filtered = sector_df[sector_df["Symbol"]
+                                            == selected_ticker]
+                if not ticker_filtered.empty:
+                    results = ticker_filtered.to_dict('records')
+
+            try:
+                # Fetch additional metrics using yfinance
+                ticker_obj = yf.Ticker(selected_ticker)
+                info = ticker_obj.info
+
+                ticker_metrics = {
+                    "name": info.get("shortName", "N/A"),
+                    "market_cap": info.get("marketCap", "N/A"),
+                    "pe_ratio": info.get("trailingPE", "N/A"),
+                    "price": info.get("regularMarketPrice", "N/A"),
+                    "dividend_yield": info.get("dividendYield", "N/A"),
+                    "52w_high": info.get("fiftyTwoWeekHigh", "N/A"),
+                    "52w_low": info.get("fiftyTwoWeekLow", "N/A")
+                }
+                app.logger.info(
+                    f"Retrieved metrics for ticker: {selected_ticker}")
+            except Exception as e:
+                ticker_metrics = {"error": str(e)}
+                app.logger.error(
+                    f"Error fetching metrics for {selected_ticker}: {e}")
+
+    except Exception as e:
+        # Handle any unexpected errors
+        app.logger.error(f"Error in explore_filter: {e}")
+        flash(f"An error occurred: {e}", "error")
+        sectors, industries = [], []
+        results = []
+        ticker_metrics = {}
+
+    # Render template with all necessary data
     return render_template('explore_filter.html',
                            sectors=sectors,
                            industries=industries,
@@ -412,6 +502,7 @@ def explore_filter():
                            selected_ticker=selected_ticker,
                            ticker_metrics=ticker_metrics,
                            name=session.get('name', 'User'))
+
 
 # -------------------------
 # Helper Functions

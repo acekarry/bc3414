@@ -34,9 +34,13 @@
                         </select>
                     </div>
                     
+                    <!-- Single hidden field for filter value -->
+                    <input type="hidden" id="filter_value" name="filter_value" value="{{ filter_value }}">
+                    
+                    <!-- Sector selection field -->
                     <div id="sectorField" class="mb-3 {% if filter_type != 'sector' %}d-none{% endif %}">
                         <label for="sector_select" class="form-label">Select Sector:</label>
-                        <select class="form-select" id="sector_select" name="filter_value">
+                        <select class="form-select" id="sector_select">
                             <option value="">-- Select a Sector --</option>
                             {% for sector in sectors %}
                             <option value="{{ sector }}" {% if filter_type == 'sector' and filter_value == sector %}selected{% endif %}>{{ sector }}</option>
@@ -44,9 +48,10 @@
                         </select>
                     </div>
                     
+                    <!-- Industry selection field -->
                     <div id="industryField" class="mb-3 {% if filter_type != 'industry' %}d-none{% endif %}">
                         <label for="industry_select" class="form-label">Select Industry:</label>
-                        <select class="form-select" id="industry_select" name="filter_value">
+                        <select class="form-select" id="industry_select">
                             <option value="">-- Select an Industry --</option>
                             {% for industry in industries %}
                             <option value="{{ industry }}" {% if filter_type == 'industry' and filter_value == industry %}selected{% endif %}>{{ industry }}</option>
@@ -54,10 +59,11 @@
                         </select>
                     </div>
                     
+                    <!-- Company name search field -->
                     <div id="nameField" class="mb-3 {% if filter_type != 'name' %}d-none{% endif %}">
-                        <label for="name_input" class="form-label">Company Name:</label>
-                        <input type="text" class="form-control" id="name_input" name="filter_value" 
-                               placeholder="Enter company name" value="{{ filter_value if filter_type == 'name' else '' }}">
+                        <label for="name_input" class="form-label">Company Name or Symbol:</label>
+                        <input type="text" class="form-control" id="name_input" 
+                               placeholder="Enter company name or ticker" value="{{ filter_value if filter_type == 'name' else '' }}">
                     </div>
                     
                     <button type="submit" class="btn btn-primary w-100">
@@ -84,7 +90,7 @@
                                 <th>Company</th>
                                 <th>Sector</th>
                                 <th>Industry</th>
-                                <th>Actions</th>
+                                <th class="text-center">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -94,14 +100,14 @@
                                 <td>{{ stock.Security }}</td>
                                 <td>{{ stock["GICS Sector"] }}</td>
                                 <td>{{ stock["GICS Sub-Industry"] }}</td>
-                                <td>
-                                    <a href="{{ url_for('explore_filter', filter_type=filter_type, filter_value=filter_value, ticker=stock.Symbol) }}" class="btn btn-sm btn-outline-primary">
+                                <td class="text-center">
+                                    <a href="{{ url_for('explore_filter', filter_type=filter_type, filter_value=filter_value, ticker=stock.Symbol) }}" class="btn btn-sm btn-outline-primary" title="View Details">
                                         <i class="fas fa-info-circle"></i>
                                     </a>
-                                    <a href="{{ url_for('explore_news', ticker=stock.Symbol) }}" class="btn btn-sm btn-outline-secondary">
+                                    <a href="{{ url_for('explore_news', ticker=stock.Symbol) }}" class="btn btn-sm btn-outline-secondary" title="View News">
                                         <i class="fas fa-newspaper"></i>
                                     </a>
-                                    <a href="{{ url_for('buy', ticker=stock.Symbol) }}" class="btn btn-sm btn-outline-success">
+                                    <a href="{{ url_for('buy', ticker=stock.Symbol) }}" class="btn btn-sm btn-outline-success" title="Buy Stock">
                                         <i class="fas fa-shopping-cart"></i>
                                     </a>
                                 </td>
@@ -192,26 +198,62 @@
 
 {% block extra_js %}
 <script>
-    // Toggle filter fields based on filter type
-    document.getElementById('filter_type').addEventListener('change', function() {
+    // Function to show the appropriate field based on filter type
+    function showFilterField(filterType) {
         const sectorField = document.getElementById('sectorField');
         const industryField = document.getElementById('industryField');
         const nameField = document.getElementById('nameField');
         
+        // Hide all fields first
         sectorField.classList.add('d-none');
         industryField.classList.add('d-none');
         nameField.classList.add('d-none');
         
-        if (this.value === 'sector') {
+        // Show the appropriate field
+        if (filterType === 'sector') {
             sectorField.classList.remove('d-none');
-        } else if (this.value === 'industry') {
+        } else if (filterType === 'industry') {
             industryField.classList.remove('d-none');
-        } else if (this.value === 'name') {
+        } else if (filterType === 'name') {
             nameField.classList.remove('d-none');
+        }
+    }
+    
+    // Initialize page - show the appropriate field when the page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        const filterType = document.getElementById('filter_type').value;
+        showFilterField(filterType);
+        
+        // Pre-select the correct value in dropdown based on current filter_value
+        const filterValue = document.getElementById('filter_value').value;
+        
+        if (filterType === 'sector' && filterValue) {
+            const sectorSelect = document.getElementById('sector_select');
+            for (let i = 0; i < sectorSelect.options.length; i++) {
+                if (sectorSelect.options[i].value === filterValue) {
+                    sectorSelect.selectedIndex = i;
+                    break;
+                }
+            }
+        } else if (filterType === 'industry' && filterValue) {
+            const industrySelect = document.getElementById('industry_select');
+            for (let i = 0; i < industrySelect.options.length; i++) {
+                if (industrySelect.options[i].value === filterValue) {
+                    industrySelect.selectedIndex = i;
+                    break;
+                }
+            }
+        } else if (filterType === 'name' && filterValue) {
+            document.getElementById('name_input').value = filterValue;
         }
     });
     
-    // Form validation
+    // Toggle filter fields when filter type changes
+    document.getElementById('filter_type').addEventListener('change', function() {
+        showFilterField(this.value);
+    });
+    
+    // Form validation and submission
     document.getElementById('filterForm').addEventListener('submit', function(event) {
         const filterType = document.getElementById('filter_type').value;
         let filterValue = '';
@@ -229,6 +271,9 @@
             alert('Please select or enter a filter value');
             return;
         }
+        
+        // Set the hidden filter_value field with the selected value
+        document.getElementById('filter_value').value = filterValue;
     });
 </script>
 {% endblock %}
