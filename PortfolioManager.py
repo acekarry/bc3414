@@ -71,9 +71,7 @@ class PortfolioManager:
             return None
 
     def create_portfolio(self, owner_id, name):
-        self.db.cursor.execute("SELECT id FROM portfolios WHERE owner_id = ?", (owner_id,))
-        existing_portfolio = self.db.cursor.fetchone()
-
+        existing_portfolio = self.db.retrieve_portfolio(owner_id)
         if existing_portfolio:
             print(f"User already has a portfolio with ID {existing_portfolio[0]}.")
             return existing_portfolio[0]
@@ -128,14 +126,16 @@ class PortfolioManager:
                 print(f"\nStock found: {ticker} - {asset_name}")
                 print(f"Current market price: ${market_price:.2f}")
 
-                
+                print("\nAdditional financial information:")
+                self.view_financial_info(ticker)
+
                 confirm = validate_input(f"Do you want to buy {asset_name} ({ticker})? (y/n): ", str).lower()
                 if confirm == 'y':
                     # For current transactions, use today's date.
                     transaction_date = str(date.today())
                     order_type = validate_input("Enter order type (market/limit): ", str).lower()
                     if order_type == 'limit':
-                        limit_price = validate_input("Enter limit price: ", str)
+                        limit_price = validate_input("Enter limit price: ", float)
                         price = limit_price
                     elif order_type == 'market':
                         price = market_price
@@ -223,10 +223,6 @@ class PortfolioManager:
         return (final_value / initial_investment) ** (1 / years) - 1
 
     def portfolio_performance(self, portfolio_id, total_long_val, total_short_val, total_long_pnl, total_short_pnl):
-        """ 
-        Computes annualized return separately for long and short positions,
-        then combines them for total portfolio performance.
-        """
         try:
             # Retrieve the earliest transaction date for this portfolio.
             self.db.cursor.execute(
@@ -298,6 +294,9 @@ class PortfolioManager:
 
                 print(f"\nAsset found: {asset_name} ({ticker})")
                 print(f"Current market price: ${market_price:.2f}")
+
+                print("\nAdditional financial information:")
+                self.view_financial_info(ticker)
 
                 confirm = validate_input(f"Do you want to sell/short {asset_name} ({ticker})? (y/n): ", str).lower()
                 if confirm == 'y':
@@ -380,7 +379,7 @@ class PortfolioManager:
     def visualise_portfolio(self, portfolio_id):
         """
         Creates a side-by-side visualization:
-        - Left: A bar chart showing current portfolio performance.
+        - Left: Showing current portfolio performance.
         - Right: A time series chart displaying, over time, total portfolio value, net deposits, and total returns.
         """
         # ----- Left: Current Portfolio Bar Chart -----
@@ -490,10 +489,7 @@ class PortfolioManager:
         plt.show()
 
     def diversification_analysis(self, portfolio_id):
-        """
-        Analyzes diversification by computing the current value per sector.
-        Uses the 'GICS Sector' from the CSV file and displays a breakdown and pie chart.
-        """
+ 
         positions = self.db.check_portfolio(portfolio_id)
         if not positions:
             print("No transactions to analyze for diversification.")
@@ -508,12 +504,13 @@ class PortfolioManager:
             if market_price is None:
                 continue
             value = market_price * data["quantity"]
-            total_value += value
+            abs_value = abs(value)  # Use absolute value for both long and short positions
+            total_value += abs_value
             if ticker in self.valid_tickers:
                 sector = self.valid_tickers[ticker].get("sector", "Unknown")
             else:
                 sector = "Unknown"
-            sector_values[sector] = sector_values.get(sector, 0) + value
+            sector_values[sector] = sector_values.get(sector, 0) + abs_value
 
         print("\nDiversification Analysis:")
         for sector, value in sector_values.items():
@@ -527,3 +524,38 @@ class PortfolioManager:
         plt.title("Portfolio Diversification by Sector")
         plt.axis('equal')
         plt.show()
+
+    def view_financial_info(self, ticker):
+             try:
+                 ticker = ticker.upper()
+                 if ticker not in self.valid_tickers:
+                     print(f"\nNo matching ticker found for {ticker}. Here are some suggestions:")
+                     self.validate_ticker(ticker)
+                     return
+ 
+                 stock = yf.Ticker(ticker)
+                 info = stock.info
+ 
+                 asset_name = self.valid_tickers[ticker]["name"]
+                 print(f"\nFinancial Information for {asset_name} ({ticker}):")
+ 
+                 print(f"Previous Close: ${info.get('previousClose', 'N/A'):.2f}")
+                 print(f"Trailing P/E Ratio: {info.get('trailingPE', 'N/A')}")
+                 print(f"Forward P/E Ratio: {info.get('forwardPE', 'N/A')}")
+                 print(f"EBITDA: ${info.get('ebitda', 'N/A'):.2f}")
+                 print(f"Book Value: ${info.get('bookValue', 'N/A'):.2f}")
+                 print(f"Market Cap: ${info.get('marketCap', 'N/A'):.2f}")
+                 print(f"52-Week Range: ${info.get('fiftyTwoWeekLow', 'N/A')} - ${info.get('fiftyTwoWeekHigh', 'N/A')}")
+                 print(f"Sector: {info.get('sector', 'N/A')}")
+                 print(f"Industry: {info.get('industry', 'N/A')}")
+ 
+                 current_price = info.get('currentPrice', 0)
+                 fifty_two_week_low = info.get('fiftyTwoWeekLow', 0)
+                 fifty_two_week_high = info.get('fiftyTwoWeekHigh', 0)
+                 if current_price and fifty_two_week_low and fifty_two_week_high:
+                     range_percent = ((current_price - fifty_two_week_low) / (fifty_two_week_high - fifty_two_week_low)) * 100
+                     print(f"Price Position in 52-Week Range: {range_percent:.1f}%")
+ 
+             except Exception as e:
+                 print(f"Error fetching financial info for {ticker}: {e}")
+ 

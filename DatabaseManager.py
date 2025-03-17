@@ -4,6 +4,11 @@ import datetime
 import csv
 import yfinance as yf
 
+class Person:
+    def __init__(self, user_id, name):
+        self.user_id = user_id
+        self.name = name
+
 class DatabaseManager:
     def __init__(self, db_name="portfolio.db"):
         self.conn = sqlite3.connect(db_name)
@@ -23,7 +28,6 @@ class DatabaseManager:
                                 FOREIGN KEY(owner_id) REFERENCES users(id))
                             ''')
 
-        # Replacing assets with transactions table
         self.cursor.execute('''CREATE TABLE IF NOT EXISTS transactions (
                                 id INTEGER PRIMARY KEY,
                                 portfolio_id INTEGER,
@@ -39,24 +43,36 @@ class DatabaseManager:
         self.conn.commit()
 
     def register_user(self, name):
+        """Registers a new user and returns a Person instance if successful."""
         try:
             self.cursor.execute("INSERT INTO users (name) VALUES (?)", (name,))
             self.conn.commit()
-            return self.cursor.lastrowid
+            user_id = self.cursor.lastrowid
+            return Person(user_id, name)
         except sqlite3.IntegrityError:
             print("User already exists. Please log in.")
             return None
 
     def login_user(self, name):
-        self.cursor.execute("SELECT id FROM users WHERE name = ?", (name,))
-        user = self.cursor.fetchone()
-        return user[0] if user else None
+        """Logs in a user and returns a Person instance if the user exists."""
+        self.cursor.execute("SELECT id, name FROM users WHERE name = ?", (name,))
+        row = self.cursor.fetchone()
+        if row:
+            return Person(row[0], row[1])
+        else:
+            print("Login failed: User not found. Creating a new account...")
+            return None
 
     def insert_portfolio(self, owner_id, name):
         self.cursor.execute(
             "INSERT INTO portfolios (owner_id, name) VALUES (?, ?)", (owner_id, name))
         self.conn.commit()
         return self.cursor.lastrowid
+    
+    def retrieve_portfolio(self,owner_id):
+        self.cursor.execute("SELECT id FROM portfolios WHERE owner_id = ?", (owner_id,))
+        existing_portfolio = self.cursor.fetchone()
+        return existing_portfolio
 
     def insert_transaction(self, portfolio_id, ticker, name, transaction_date, order_type, price, quantity, limit_price=None):
         """Records a transaction (buy/sell) for the portfolio."""
@@ -85,7 +101,7 @@ class DatabaseManager:
             return {}
         if export:
             return transactions
-        
+
         positions = {}
         for t in transactions:
             ticker, name, t_date, order_type, price, quantity, limit_price = t
@@ -103,9 +119,9 @@ class DatabaseManager:
                     avg_cost = positions[ticker]["total_cost"] / existing_quantity
                 else:
                     avg_cost = 0
-                
+
                 positions[ticker]["quantity"] += quantity
-                
+
                 if positions[ticker]["quantity"] >= 0:
                     positions[ticker]["total_cost"] += avg_cost * quantity
                 else:

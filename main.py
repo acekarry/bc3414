@@ -18,13 +18,14 @@ if __name__ == "__main__":
         else:
             break  
 
-    user_id = manager.login(name) or manager.register(name)
+    user = manager.login(name) or manager.register(name)
+    user_id = user.user_id
 
     portfolio_name = f"{name}'s Portfolio"
     portfolio_id = manager.create_portfolio(user_id, portfolio_name)
 
     while True:
-        print("\nOptions: \n1) Buy Stock   \n2) Sell/Short Sell Stock \n3) Add historical transanction\n4) Check Portfolio   \n5) Visualize Portfolio  \n6) Diversification Analysis  \n7) Export Portfolio \n8) Import Portfolio\n9) Explore Stocks\n10) Exit")
+        print("\nOptions: \n1) Buy Stock   \n2) Sell/Short Sell Stock \n3) Add historical transanction\n4) Check Portfolio   \n5) Visualize Portfolio  \n6) Diversification Analysis \n7) Explore Stocks\n8) Import Portfolio\n9) Export Portfolio\n10) Exit")
         choice = validate_input("Enter choice: ", str)
 
         if choice == "1":
@@ -40,11 +41,11 @@ if __name__ == "__main__":
         elif choice == "6":
             manager.diversification_analysis(portfolio_id)
         elif choice == "7":
-            manager.export_portfolio(portfolio_id)
-        elif choice == "8":
-            manager.import_portfolio(portfolio_id)
-        elif choice == "9":
             explorer.menu()
+        elif choice == "8":
+            manager.import_portfolio(portfolio_id) 
+        elif choice == "9":
+            manager.export_portfolio(portfolio_id)
         elif choice == "10":
             print("Exiting...")
             break
