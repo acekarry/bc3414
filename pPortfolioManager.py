@@ -1,4 +1,4 @@
-from DatabaseManager import DatabaseManager
+from dDatabaseManager import DatabaseManager
 from NewsScraper import NewsScraper
 import datetime
 import csv

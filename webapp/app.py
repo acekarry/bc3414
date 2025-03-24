@@ -19,7 +19,6 @@ db_manager = DatabaseManager()
 portfolio_manager = PortfolioManager()
 stock_explorer = StockExplorer()
 news_scraper = NewsScraper()
-
 # Teardown the per-request database connection
 @app.teardown_appcontext
 def close_connection(exception):
@@ -39,23 +38,16 @@ def index():
 
 @app.route('/login', methods=['POST'])
 def login():
-    name = request.form.get('name', '').strip().lower()
-    
+    username = request.form.get('username', '').strip()
+    password = request.form.get('password', '').strip()
+
     # Basic validation
-    if not name:
-        flash('Name cannot be empty', 'error')
-        return redirect(url_for('index'))
-    if any(char.isdigit() for char in name):
-        flash('Name cannot contain numbers', 'error')
-        return redirect(url_for('index'))
-    if not all(char.isalpha() or char.isspace() for char in name):
-        flash('Name can only contain letters and spaces', 'error')
+    if not username or not password:
+        flash('Username and password cannot be empty', 'error')
         return redirect(url_for('index'))
 
-    # Login or register user using updated methods (returning a Person object)
-    user = portfolio_manager.login(name)
-    if not user:
-        user = portfolio_manager.register(name)
+    # Login user using the updated methods
+    user = portfolio_manager.login(username, password)
     
     if user:
         session['user_id'] = user.user_id
@@ -68,8 +60,48 @@ def login():
 
         return redirect(url_for('dashboard'))
 
-    flash('Error logging in', 'error')
+    flash('Error logging in. Please check your username and password.', 'error')
     return redirect(url_for('index'))
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        first_name = request.form.get('first_name', '').strip()
+        last_name = request.form.get('last_name', '').strip()
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+
+        # Basic validation
+        if not first_name or not last_name or not username or not password:
+            flash('All fields are required', 'error')
+            return redirect(url_for('signup'))
+
+        if any(char.isdigit() for char in first_name) or any(char.isdigit() for char in last_name):
+            flash('First and Last names cannot contain numbers', 'error')
+            return redirect(url_for('signup'))
+
+        if not all(char.isalpha() or char.isspace() for char in first_name) or not all(char.isalpha() or char.isspace() for char in last_name):
+            flash('First and Last names can only contain letters and spaces', 'error')
+            return redirect(url_for('signup'))
+
+        # Register user using the updated method
+        user = portfolio_manager.register(first_name, last_name, username, password)
+        
+        if user:
+            session['user_id'] = user.user_id
+            session['name'] = user.name
+
+            # Create portfolio if needed
+            portfolio_name = f"{user.name}'s Portfolio"
+            portfolio_id = portfolio_manager.create_portfolio(user.user_id, portfolio_name)
+            session['portfolio_id'] = portfolio_id
+
+            return redirect(url_for('dashboard'))
+
+        flash('Error signing up. Username may already exist or other issue.', 'error')
+        return redirect(url_for('signup'))
+
+    return render_template('signup.html')
 
 @app.route('/logout')
 def logout():

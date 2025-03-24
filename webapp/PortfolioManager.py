@@ -17,11 +17,11 @@ class PortfolioManager:
         self.db = DatabaseManager()
         self.valid_tickers = self.db.load_valid_tickers()
 
-    def register(self, name):
-        return self.db.register_user(name)
+    def register(self, first_name, last_name, username, password):
+        return self.db.register_user(first_name, last_name, username, password)
 
-    def login(self, name):
-        return self.db.login_user(name)
+    def login(self, username, password):
+        return self.db.login_user(username, password)
 
     def get_price(self, ticker, transaction_date=None):
         """

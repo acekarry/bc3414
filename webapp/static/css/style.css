@@ -2,11 +2,14 @@
 body {
     background-color: #f8f9fa;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
 }
 
 .navbar-brand {
     font-weight: 600;
     letter-spacing: 0.5px;
+    font-size: 1.2rem;
 }
 
 /* Cards */
@@ -26,6 +29,8 @@ body {
     background-color: #fff;
     border-bottom: 1px solid rgba(0, 0, 0, 0.05);
     font-weight: 600;
+    font-size: 1.1rem;
+    padding: 12px;
 }
 
 /* Forms */
@@ -33,6 +38,7 @@ body {
     border-radius: 8px;
     padding: 10px 15px;
     border: 1px solid #e0e0e0;
+    font-size: 1rem;
 }
 
 .form-control:focus, .form-select:focus {
@@ -46,6 +52,7 @@ body {
     padding: 8px 16px;
     font-weight: 500;
     transition: all 0.3s ease;
+    font-size: 1rem;
 }
 
 .btn-primary {
@@ -81,15 +88,23 @@ body {
 /* Tables */
 .table {
     margin-bottom: 0;
+    font-size: 1rem;
 }
 
 .table th {
     font-weight: 600;
     border-top: none;
+    background-color: #f8f9fa;
 }
 
 .table td {
     vertical-align: middle;
+    padding: 12px 15px;
+}
+
+.table-responsive {
+    margin-bottom: 20px;
+    border-radius: 10px;
 }
 
 /* Performance indicators */
@@ -105,12 +120,14 @@ body {
 .alert {
     border-radius: 8px;
     padding: 12px 20px;
+    font-size: 1rem;
 }
 
 /* Login page */
 .login-container {
     max-width: 400px;
     margin: 0 auto;
+    padding-top: 50px;
 }
 
 /* Dashboard */
@@ -134,22 +151,34 @@ body {
     .table-responsive {
         border-radius: 10px;
     }
+
+    .form-control, .form-select {
+        font-size: 0.95rem;
+    }
+
+    .btn {
+        font-size: 0.95rem;
+    }
 }
 
 /* News items */
 .news-item .card-title {
     font-size: 1.1rem;
     line-height: 1.4;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: nowrap;            /* Prevent the text from wrapping */
+    overflow: hidden;               /* Hide overflow */
+    text-overflow: ellipsis;        /* Show an ellipsis (...) when the text overflows */
+    display: block;                 /* Make sure the block-level behavior is applied */
+    width: 100%;                    /* Ensure the element takes the full width of the container */
 }
 
 /* Stock explorer */
 .ticker-suggestion {
     transition: background-color 0.2s ease;
+}
+
+.ticker-suggestion:hover {
+    background-color: #e9ecef;
 }
 
 /* Animations */
@@ -160,4 +189,18 @@ body {
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background-color: rgba(0, 0, 0, 0.05);
 }

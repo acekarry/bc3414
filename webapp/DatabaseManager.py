@@ -4,6 +4,7 @@ import datetime
 import csv
 import yfinance as yf
 from flask import g
+import hashlib
 
 class Person:
     def __init__(self, user_id, name):
@@ -13,16 +14,18 @@ class Person:
 class DatabaseManager:
     def __init__(self, db_name="portfolio.db"):
         self.db_name = db_name
-        # Initialize database tables using a temporary connection
-        conn = sqlite3.connect(db_name, check_same_thread=False)
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        db_path = os.path.join(base_dir, db_name)
+
+        conn = sqlite3.connect(db_path, check_same_thread=False)
         cursor = conn.cursor()
         self.create_tables(cursor)
-        conn.commit()
-        conn.close()
 
     def get_connection(self):
         if 'db' not in g:
-            g.db = sqlite3.connect(self.db_name, check_same_thread=False)
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            db_path = os.path.join(base_dir, self.db_name)
+            g.db = sqlite3.connect(db_path, check_same_thread=False)
         return g.db
 
     def get_cursor(self):
@@ -31,14 +34,16 @@ class DatabaseManager:
     def create_tables(self, cursor):
         cursor.execute('''CREATE TABLE IF NOT EXISTS users (
                                 id INTEGER PRIMARY KEY, 
-                                name TEXT UNIQUE)''')
+                                first_name TEXT,
+                                last_name TEXT,
+                                username TEXT UNIQUE, 
+                                password TEXT)''')
 
         cursor.execute('''CREATE TABLE IF NOT EXISTS portfolios (
                                 id INTEGER PRIMARY KEY, 
                                 owner_id INTEGER UNIQUE, 
                                 name TEXT, 
-                                FOREIGN KEY(owner_id) REFERENCES users(id))
-                            ''')
+                                FOREIGN KEY(owner_id) REFERENCES users(id))''')
 
         cursor.execute('''CREATE TABLE IF NOT EXISTS transactions (
                                 id INTEGER PRIMARY KEY,
@@ -50,30 +55,40 @@ class DatabaseManager:
                                 price REAL,
                                 quantity INTEGER,
                                 limit_price REAL,
-                                FOREIGN KEY(portfolio_id) REFERENCES portfolios(id)
-                            )''')
+                                FOREIGN KEY(portfolio_id) REFERENCES portfolios(id))''')
 
-    def register_user(self, name):
+    def register_user(self, first_name, last_name, username, password):
         conn = self.get_connection()
         cursor = conn.cursor()
+
+        # Hash the password for security
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+
         try:
-            cursor.execute("INSERT INTO users (name) VALUES (?)", (name,))
+            cursor.execute("INSERT INTO users (first_name, last_name, username, password) VALUES (?, ?, ?, ?)", 
+                           (first_name, last_name, username, hashed_password))
             conn.commit()
             user_id = cursor.lastrowid
-            return Person(user_id, name)
+            return Person(user_id, first_name + ' ' + last_name)
         except sqlite3.IntegrityError:
-            print("User already exists. Please log in.")
+            print("Username already exists. Please try a different one.")
             return None
 
-    def login_user(self, name):
+    def login_user(self, username, password):
         conn = self.get_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT id, name FROM users WHERE name = ?", (name,))
+        cursor.execute("SELECT id, first_name, last_name, password FROM users WHERE username = ?", (username,))
         row = cursor.fetchone()
         if row:
-            return Person(row[0], row[1])
+            # Check password
+            hashed_password = hashlib.sha256(password.encode()).hexdigest()
+            if hashed_password == row[3]:
+                return Person(row[0], row[1] + ' ' + row[2])
+            else:
+                print("Login failed: Incorrect password.")
+                return None
         else:
-            print("Login failed: User not found. Creating a new account...")
+            print("Login failed: User not found.")
             return None
 
     def insert_portfolio(self, owner_id, name):

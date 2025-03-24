@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}StockFolio - Login{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="text-center mb-5">
+            <h1 class="display-4"><i class="fas fa-sign-in-alt me-3"></i>Login</h1>
+            <p class="lead">Log in to access your portfolio</p>
+        </div>
+        
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-sign-in-alt me-2"></i>Login</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('login') }}" method="post">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username:</label>
+                        <input type="text" class="form-control" id="username" name="username" placeholder="Enter your username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password:</label>
+                        <input type="password" class="form-control" id="password" name="password" placeholder="Enter your password" required>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-sign-in-alt me-2"></i>Login
+                        </button>
+                    </div>
+                </form>
+                <hr>
+                <div class="text-center">
+                    <p>Don't have an account? <a href="{{ url_for('signup') }}">Sign Up</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
