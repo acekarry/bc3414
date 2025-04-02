@@ -7,9 +7,6 @@
     .performance-card {
         transition: transform 0.3s ease;
     }
-    .performance-card:hover {
-        transform: translateY(-5px);
-    }
     .table-responsive {
         overflow-x: auto;
     }
@@ -18,6 +15,13 @@
     }
     .negative {
         color: #dc3545;
+    }
+    .sector-card {
+        height: 100%;
+    }
+    .chart-img {
+        max-width: 100%;
+        height: auto;
     }
 </style>
 {% endblock %}
@@ -77,18 +81,26 @@
             <div class="card-header">
                 <h5 class="mb-0">Portfolio Performance</h5>
             </div>
-            <div class="card-body">
-                <canvas id="performanceChart" height="300"></canvas>
+            <div class="card-body text-center">
+                {% if performance_chart %}
+                <img src="data:image/png;base64,{{ performance_chart }}" alt="Portfolio Performance Chart" class="chart-img">
+                {% else %}
+                <p class="text-muted">No performance data available</p>
+                {% endif %}
             </div>
         </div>
     </div>
     <div class="col-lg-4 mb-4">
-        <div class="card shadow-sm h-100">
+        <div class="card shadow-sm sector-card">
             <div class="card-header">
                 <h5 class="mb-0">Sector Allocation</h5>
             </div>
-            <div class="card-body">
-                <canvas id="sectorChart" height="300"></canvas>
+            <div class="card-body text-center">
+                {% if sector_chart %}
+                <img src="data:image/png;base64,{{ sector_chart }}" alt="Sector Allocation Chart" class="chart-img">
+                {% else %}
+                <p class="text-muted">No sector data available</p>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -149,128 +161,4 @@
         </div>
     </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-    // Performance chart
-    const performanceData = {{ performance_data|safe }};
-    if (performanceData && performanceData.length > 0) {
-        const ctx = document.getElementById('performanceChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: performanceData.map(d => d.date),
-                datasets: [
-                    {
-                        label: 'Portfolio Value',
-                        data: performanceData.map(d => d.value),
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.1
-                    },
-                    {
-                        label: 'Net Deposits',
-                        data: performanceData.map(d => d.deposits),
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        backgroundColor: 'transparent',
-                        borderWidth: 2,
-                        borderDash: [5, 5],
-                        fill: false,
-                        tension: 0.1
-                    },
-                    {
-                        label: 'Total Returns',
-                        data: performanceData.map(d => d.returns),
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        backgroundColor: 'transparent',
-                        borderWidth: 2,
-                        fill: false,
-                        tension: 0.1
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        grid: {
-                            display: false
-                        }
-                    },
-                    y: {
-                        beginAtZero: false
-                    }
-                },
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return context.dataset.label + ': $' + context.raw.toFixed(2);
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    // Sector allocation chart
-    const sectorData = {{ sector_data|safe }};
-    if (sectorData && sectorData.length > 0) {
-        const ctx = document.getElementById('sectorChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: sectorData.map(d => d.sector),
-                datasets: [{
-                    data: sectorData.map(d => d.value),
-                    backgroundColor: [
-                        'rgba(255, 99, 132, 0.7)',
-                        'rgba(54, 162, 235, 0.7)',
-                        'rgba(255, 206, 86, 0.7)',
-                        'rgba(75, 192, 192, 0.7)',
-                        'rgba(153, 102, 255, 0.7)',
-                        'rgba(255, 159, 64, 0.7)',
-                        'rgba(199, 199, 199, 0.7)',
-                        'rgba(83, 102, 255, 0.7)',
-                        'rgba(40, 159, 64, 0.7)',
-                        '   rgba(210, 99, 132, 0.7)',
-                        'rgba(54, 72, 235, 0.7)'
-                    ],
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'right',
-                        labels: {
-                            boxWidth: 12
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const value = context.raw;
-                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = ((value / total) * 100).toFixed(1);
-                                return `${context.label}: $${value.toFixed(2)} (${percentage}%)`;
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    }
-</script>
 {% endblock %}

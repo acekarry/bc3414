@@ -1,113 +1,123 @@
-/* Global Styles */
 body {
     background-color: #f8f9fa;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
 }
 
+.navbar {
+    background-color: #343a40;
+    padding: 10px 0;
+}
+
 .navbar-brand {
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    font-size: 1.2rem;
+    color: white;
+    font-weight: bold;
+    font-size: 20px;
 }
 
-/* Cards */
+.navbar-dark .navbar-nav .nav-link {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.navbar-dark .navbar-nav .nav-link:hover {
+    color: white;
+}
+
+.container {
+    padding: 20px 15px;
+}
+
 .card {
-    border-radius: 10px;
+    border-radius: 8px;
     border: none;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-    transition: box-shadow 0.3s ease;
-}
-
-.card:hover {
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
 }
 
 .card-header {
-    border-radius: 10px 10px 0 0 !important;
-    background-color: #fff;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-    font-weight: 600;
-    font-size: 1.1rem;
-    padding: 12px;
-}
-
-/* Forms */
-.form-control, .form-select {
-    border-radius: 8px;
+    border-radius: 8px 8px 0 0;
+    background-color: white;
+    border-bottom: 1px solid #eee;
     padding: 10px 15px;
-    border: 1px solid #e0e0e0;
-    font-size: 1rem;
+    font-weight: bold;
 }
 
-.form-control:focus, .form-select:focus {
-    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
-    border-color: #86b7fe;
+.card-body {
+    padding: 15px;
 }
 
-/* Buttons */
+.form-control, .form-select {
+    border-radius: 6px;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    margin-bottom: 15px;
+}
+
 .btn {
-    border-radius: 8px;
-    padding: 8px 16px;
-    font-weight: 500;
-    transition: all 0.3s ease;
-    font-size: 1rem;
+    border-radius: 6px;
+    padding: 8px 15px;
+    font-weight: bold;
 }
 
 .btn-primary {
     background-color: #0d6efd;
     border-color: #0d6efd;
-}
-
-.btn-primary:hover {
-    background-color: #0b5ed7;
-    border-color: #0a58ca;
+    color: white;
 }
 
 .btn-success {
     background-color: #198754;
     border-color: #198754;
-}
-
-.btn-success:hover {
-    background-color: #157347;
-    border-color: #146c43;
+    color: white;
 }
 
 .btn-danger {
     background-color: #dc3545;
     border-color: #dc3545;
+    color: white;
 }
 
-.btn-danger:hover {
-    background-color: #bb2d3b;
-    border-color: #b02a37;
+.btn-outline-secondary {
+    background-color: transparent;
+    border-color: #6c757d;
+    color: #6c757d;
 }
 
-/* Tables */
+.alert {
+    border-radius: 6px;
+    padding: 10px 15px;
+    margin-bottom: 20px;
+}
+
+.alert-success {
+    background-color: #d1e7dd;
+    border-color: #badbcc;
+    color: #0f5132;
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    border-color: #f5c2c7;
+    color: #842029;
+}
+
 .table {
-    margin-bottom: 0;
-    font-size: 1rem;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table th, .table td {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
 }
 
 .table th {
-    font-weight: 600;
-    border-top: none;
     background-color: #f8f9fa;
+    font-weight: bold;
+    text-align: left;
 }
 
-.table td {
-    vertical-align: middle;
-    padding: 12px 15px;
-}
-
-.table-responsive {
-    margin-bottom: 20px;
-    border-radius: 10px;
-}
-
-/* Performance indicators */
 .positive {
     color: #198754;
 }
@@ -116,91 +126,57 @@ body {
     color: #dc3545;
 }
 
-/* Alerts */
-.alert {
-    border-radius: 8px;
-    padding: 12px 20px;
-    font-size: 1rem;
+.breadcrumb {
+    margin-bottom: 20px;
+    padding: 8px 0;
 }
 
-/* Login page */
-.login-container {
-    max-width: 400px;
-    margin: 0 auto;
-    padding-top: 50px;
+.breadcrumb-item a {
+    color: #0d6efd;
+    text-decoration: none;
 }
 
-/* Dashboard */
-.performance-card {
+.text-center {
     text-align: center;
-    padding: 20px;
 }
 
-.performance-card h3 {
-    font-size: 2rem;
-    font-weight: 600;
-    margin-top: 10px;
+.mb-4 {
+    margin-bottom: 1.5rem;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .card {
-        margin-bottom: 20px;
-    }
-    
-    .table-responsive {
-        border-radius: 10px;
-    }
-
-    .form-control, .form-select {
-        font-size: 0.95rem;
-    }
-
-    .btn {
-        font-size: 0.95rem;
-    }
+.mb-3 {
+    margin-bottom: 1rem;
 }
 
-/* News items */
-.news-item .card-title {
-    font-size: 1.1rem;
-    line-height: 1.4;
-    white-space: nowrap;            /* Prevent the text from wrapping */
-    overflow: hidden;               /* Hide overflow */
-    text-overflow: ellipsis;        /* Show an ellipsis (...) when the text overflows */
-    display: block;                 /* Make sure the block-level behavior is applied */
-    width: 100%;                    /* Ensure the element takes the full width of the container */
+.suggestions-container {
+    position: absolute;
+    width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 0 0 6px 6px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    display: none;
+    z-index: 1000;
 }
 
-/* Stock explorer */
 .ticker-suggestion {
-    transition: background-color 0.2s ease;
+    padding: 8px 10px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
 }
 
 .ticker-suggestion:hover {
-    background-color: #e9ecef;
+    background-color: #f8f9fa;
 }
 
-/* Animations */
-.fade-in {
-    animation: fadeIn 0.5s ease-in;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-/* Custom scrollbars */
-::-webkit-scrollbar {
-    width: 8px;
-}
-
-::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.2);
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-track {
-    background-color: rgba(0, 0, 0, 0.05);
+@media (max-width: 768px) {
+    .container {
+        padding: 10px;
+    }
+    
+    .card {
+        margin-bottom: 15px;
+    }
 }

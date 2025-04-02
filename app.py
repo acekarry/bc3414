@@ -5,11 +5,16 @@ import yfinance as yf
 from datetime import date, datetime, timedelta
 import pandas as pd
 import json
+from flask import Flask, request, redirect, url_for
+
 
 from DatabaseManager import DatabaseManager
 from PortfolioManager import PortfolioManager
 from StockExplorer import StockExplorer
 from NewsScraper import NewsScraper
+from plotly_charts import generate_performance_chart, generate_sector_chart
+from market_overview import get_market_data
+
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # For session management
@@ -26,6 +31,28 @@ def close_connection(exception):
     if db is not None:
         db.close()
 
+
+def setup_historical_routes(app, portfolio_manager):
+    @app.route('/ticker_search', methods=['GET'])
+    def ticker_search():
+        if 'user_id' not in session:
+            return redirect(url_for('index'))
+
+        query = request.args.get('query', '').upper()
+        valid_tickers = portfolio_manager.valid_tickers
+
+        matching_tickers = []
+        if query:
+            matching_tickers = [
+                (ticker, data['name'])
+                for ticker, data in valid_tickers.items()
+                if ticker.startswith(query) or query.lower() in data['name'].lower()
+            ][:10]  # Limit to 10 results
+
+        return render_template('ticker_results.html',
+                               matching_tickers=matching_tickers,
+                               query=query)
+    
 # -------------------------
 # Routes
 # -------------------------
@@ -108,6 +135,7 @@ def logout():
     session.clear()
     return redirect(url_for('index'))
 
+
 @app.route('/dashboard')
 def dashboard():
     if 'user_id' not in session:
@@ -141,7 +169,8 @@ def dashboard():
             pnl = (avg_price - market_price) * abs(quantity)
             position_type = "Short"
 
-        pnl_percent = (pnl / abs(current_value)) * 100 if current_value != 0 else 0
+        pnl_percent = (pnl / abs(current_value)) * \
+            100 if current_value != 0 else 0
 
         portfolio_data.append({
             'ticker': ticker,
@@ -159,19 +188,24 @@ def dashboard():
         total_cost += data["total_cost"]
 
     total_pnl = total_value - total_cost
-    total_pnl_percent = (total_pnl / abs(total_value)) * 100 if total_value != 0 else 0
+    total_pnl_percent = (total_pnl / abs(total_value)) * \
+        100 if total_value != 0 else 0
 
-    # Get performance and sector data for charts
-    performance_data = json.dumps(get_portfolio_performance_data(portfolio_id))
-    sector_data = json.dumps(get_portfolio_sector_data(portfolio_id))
+    # Get performance and sector data
+    perf_data = get_portfolio_performance_data(portfolio_id)
+    sector_data = get_portfolio_sector_data(portfolio_id)
+
+    # Generate static chart images
+    performance_chart = generate_performance_chart(perf_data)
+    sector_chart = generate_sector_chart(sector_data)
 
     return render_template('dashboard.html',
                            portfolio_data=portfolio_data,
                            total_value=float(total_value),
                            total_pnl=float(total_pnl),
                            total_pnl_percent=float(total_pnl_percent),
-                           performance_data=performance_data,
-                           sector_data=sector_data,
+                           performance_chart=performance_chart,
+                           sector_chart=sector_chart,
                            name=session.get('name', 'User'))
 
 @app.route('/buy', methods=['GET', 'POST'])
@@ -284,10 +318,16 @@ def sell():
 
     return render_template('sell.html', name=session.get('name', 'User'))
 
+
 @app.route('/historical', methods=['GET', 'POST'])
 def historical():
     if 'user_id' not in session:
         return redirect(url_for('index'))
+
+    selected_ticker = request.args.get('ticker', '')
+    selected_name = request.args.get('name', '')
+    matching_tickers = []
+    query = ''
 
     if request.method == 'POST':
         ticker = request.form.get('ticker', '').upper()
@@ -332,11 +372,54 @@ def historical():
         db_manager.insert_transaction(portfolio_id, ticker, asset_name, transaction_date,
                                       'historical', price, quantity, None)
 
-        flash(f'Successfully recorded historical purchase of {quantity} shares of {ticker} at ${price:.2f} on {transaction_date}', 'success')
+        flash(
+            f'Successfully recorded historical purchase of {quantity} shares of {ticker} at ${price:.2f} on {transaction_date}', 'success')
         return redirect(url_for('dashboard'))
 
-    return render_template('historical.html', max_date=date.today().strftime('%Y-%m-%d'),
+    return render_template('historical.html',
+                           max_date=date.today().strftime('%Y-%m-%d'),
+                           selected_ticker=selected_ticker,
+                           selected_name=selected_name,
+                           matching_tickers=matching_tickers,
+                           query=query,
                            name=session.get('name', 'User'))
+
+
+@app.route('/ticker_search', methods=['GET'])
+def ticker_search():
+    if 'user_id' not in session:
+        return redirect(url_for('index'))
+
+    query = request.args.get('query', '').upper()
+    valid_tickers = portfolio_manager.valid_tickers
+
+    matching_tickers = []
+    if query:
+        # Direct matches (tickers that start with the query)
+        direct_matches = [
+            (ticker, data['name'])
+            for ticker, data in valid_tickers.items()
+            if ticker.startswith(query)
+        ]
+
+        # Fuzzy matches (company names containing the query)
+        fuzzy_matches = [
+            (ticker, data['name'])
+            for ticker, data in valid_tickers.items()
+            if query.lower() in data['name'].lower() and not ticker.startswith(query)
+        ]
+
+        matching_tickers = direct_matches + fuzzy_matches
+        matching_tickers = matching_tickers[:10]  # Limit to 10 results
+
+    return render_template('historical.html',
+                           max_date=date.today().strftime('%Y-%m-%d'),
+                           matching_tickers=matching_tickers,
+                           query=query,
+                           selected_ticker='',
+                           selected_name='',
+                           name=session.get('name', 'User'))
+
 
 @app.route('/search_ticker', methods=['GET'])
 def search_ticker():
@@ -363,12 +446,16 @@ def search_ticker():
     results = direct_matches + fuzzy_matches
     return jsonify(results[:10])  # Limit to 10 results
 
+
 @app.route('/explore')
 def explore():
     if 'user_id' not in session:
         return redirect(url_for('index'))
-    return render_template('explore.html', name=session.get('name', 'User'))
+    market_data = get_market_data()
 
+    return render_template('explore.html',
+                           market_data=market_data,
+                           name=session.get('name', 'User'))
 @app.route('/explore/news', methods=['GET', 'POST'])
 def explore_news():
     if 'user_id' not in session:
