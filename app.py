@@ -456,6 +456,8 @@ def explore():
     return render_template('explore.html',
                            market_data=market_data,
                            name=session.get('name', 'User'))
+
+
 @app.route('/explore/news', methods=['GET', 'POST'])
 def explore_news():
     if 'user_id' not in session:
@@ -463,9 +465,28 @@ def explore_news():
 
     news = []
     ticker = request.args.get('ticker', '').upper()
+    query = request.args.get('query', '')
+
+    # Handle search suggestions (without JavaScript)
+    matching_tickers = []
+    valid_tickers = portfolio_manager.valid_tickers
+    if query and not ticker:
+        # Direct matches (tickers that start with the query)
+        direct_matches = [
+            {'ticker': t, 'name': data['name']}
+            for t, data in valid_tickers.items()
+            if t.startswith(query.upper())
+        ]
+        # Fuzzy matches (company names containing the query)
+        fuzzy_matches = [
+            {'ticker': t, 'name': data['name']}
+            for t, data in valid_tickers.items()
+            if query.lower() in data['name'].lower() and not t.startswith(query.upper())
+        ]
+        matching_tickers = direct_matches + fuzzy_matches
+        matching_tickers = matching_tickers[:10]  # Limit to 10 results
 
     if ticker:
-        valid_tickers = portfolio_manager.valid_tickers
         if ticker in valid_tickers:
             asset_name = valid_tickers[ticker]["name"]
 
@@ -482,8 +503,31 @@ def explore_news():
                     'date': item.get('date', 'N/A'),
                     'source': item.get('media', 'Unknown')
                 } for item in results[:10]]
-    return render_template('explore_news.html', news=news, ticker=ticker,
-                           name=session.get('name', 'User'))
+        else:
+            flash(f"Ticker '{ticker}' not found. Did you mean one of these?", 'error')
+
+            # Suggest similar tickers
+            direct_matches = [
+                {'ticker': t, 'name': data['name']}
+                for t, data in valid_tickers.items()
+                if t.startswith(ticker)
+            ]
+            fuzzy_matches = [
+                {'ticker': t, 'name': data['name']}
+                for t, data in valid_tickers.items()
+                if ticker.lower() in data['name'].lower() and not t.startswith(ticker)
+            ]
+            matching_tickers = (direct_matches + fuzzy_matches)[:10]
+
+
+    return render_template(
+        'explore_news.html',
+        news=news,
+        ticker=ticker,
+        query=query,
+        matching_tickers=matching_tickers,
+        name=session.get('name', 'User')
+    )
 
 
 @app.route('/explore/filter', methods=['GET', 'POST'])
@@ -755,6 +799,7 @@ def convert_to_serializable(obj):
         return obj.isoformat()
     else:
         return obj
+
 
 # -------------------------
 # Run the App
