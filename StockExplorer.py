@@ -1,7 +1,7 @@
 import pandas as pd
 from InputValidator import validate_input
 from NewsScraper import NewsScraper
-from dDatabaseManager import DatabaseManager
+from DatabaseManager import DatabaseManager
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter, FuzzyCompleter
 import shutil
