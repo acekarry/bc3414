@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, g
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash, g, Response
 import os
 import sqlite3
 import yfinance as yf
@@ -6,6 +6,9 @@ from datetime import date, datetime, timedelta
 import pandas as pd
 import json
 from flask import Flask, request, redirect, url_for
+import io
+import csv
+from collections import defaultdict
 
 
 from DatabaseManager import DatabaseManager
@@ -25,6 +28,8 @@ portfolio_manager = PortfolioManager()
 stock_explorer = StockExplorer()
 news_scraper = NewsScraper()
 # Teardown the per-request database connection
+
+
 @app.teardown_appcontext
 def close_connection(exception):
     db = g.pop('db', None)
@@ -52,16 +57,18 @@ def setup_historical_routes(app, portfolio_manager):
         return render_template('ticker_results.html',
                                matching_tickers=matching_tickers,
                                query=query)
-    
+
 # -------------------------
 # Routes
 # -------------------------
+
 
 @app.route('/')
 def index():
     if 'user_id' in session:
         return redirect(url_for('dashboard'))
     return render_template('index.html')
+
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -75,20 +82,22 @@ def login():
 
     # Login user using the updated methods
     user = portfolio_manager.login(username, password)
-    
+
     if user:
         session['user_id'] = user.user_id
         session['name'] = user.name
 
         # Create portfolio if needed
         portfolio_name = f"{user.name}'s Portfolio"
-        portfolio_id = portfolio_manager.create_portfolio(user.user_id, portfolio_name)
+        portfolio_id = portfolio_manager.create_portfolio(
+            user.user_id, portfolio_name)
         session['portfolio_id'] = portfolio_id
 
         return redirect(url_for('dashboard'))
 
     flash('Error logging in. Please check your username and password.', 'error')
     return redirect(url_for('index'))
+
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -112,15 +121,17 @@ def signup():
             return redirect(url_for('signup'))
 
         # Register user using the updated method
-        user = portfolio_manager.register(first_name, last_name, username, password)
-        
+        user = portfolio_manager.register(
+            first_name, last_name, username, password)
+
         if user:
             session['user_id'] = user.user_id
             session['name'] = user.name
 
             # Create portfolio if needed
             portfolio_name = f"{user.name}'s Portfolio"
-            portfolio_id = portfolio_manager.create_portfolio(user.user_id, portfolio_name)
+            portfolio_id = portfolio_manager.create_portfolio(
+                user.user_id, portfolio_name)
             session['portfolio_id'] = portfolio_id
 
             return redirect(url_for('dashboard'))
@@ -129,6 +140,7 @@ def signup():
         return redirect(url_for('signup'))
 
     return render_template('signup.html')
+
 
 @app.route('/logout')
 def logout():
@@ -208,8 +220,99 @@ def dashboard():
                            sector_chart=sector_chart,
                            name=session.get('name', 'User'))
 
+
+@app.route("/export_holdings")
+def export_holdings():
+    portfolio_id = session.get('portfolio_id')
+    transactions = db_manager.check_portfolio(portfolio_id, export=True)
+
+    if not transactions:
+        return "No holdings to export.", 204
+
+    holdings = defaultdict(lambda: {"name": "", "quantity": 0, "avg_price": 0})
+
+    for ticker, name, transaction_date, order_type, price, quantity, limit_price in transactions:
+        price = float(price)
+        quantity = int(quantity)
+
+        if ticker not in holdings:
+            holdings[ticker]["name"] = name
+
+        holdings[ticker]["quantity"] += quantity
+
+        if holdings[ticker]["quantity"]:
+            total_cost = holdings[ticker]["avg_price"] * \
+                (holdings[ticker]["quantity"] - quantity) + (price * quantity)
+            holdings[ticker]["avg_price"] = total_cost / \
+                holdings[ticker]["quantity"]
+        else:
+            holdings[ticker]["avg_price"] = 0
+
+    holdings = {ticker: data for ticker,
+                data in holdings.items()}
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ticker", "name", "quantity",
+                    "avg_price"])
+
+    for ticker, data in holdings.items():
+        writer.writerow(
+            [ticker, data["name"], data["quantity"], round(data["avg_price"], 2)])
+
+    output.seek(0)
+
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment;filename=portfolio_holdings.csv"}
+    )
+
+
+@app.route("/import_holdings", methods=["POST"])
+def import_holdings():
+    if "file" not in request.files:
+        flash("No file part", "danger")
+        return redirect(url_for("dashboard"))
+
+    file = request.files["file"]
+
+    if file.filename == "":
+        flash("No selected file", "warning")
+        return redirect(url_for("dashboard"))
+
+    if file:
+        try:
+            portfolio_id = session.get('portfolio_id')
+            stream = io.StringIO(file.stream.read().decode("utf-8"))
+            reader = csv.reader(stream)
+
+            headers = next(reader)  # Read the first row (header)
+            expected_headers = ["ticker", "name", "transaction_date",
+                                "order_type", "price", "quantity", "limit_price"]
+
+            if headers != expected_headers:
+                flash("Invalid CSV format", "danger")
+                return redirect(url_for("dashboard"))
+
+            for row in reader:
+                ticker, name, transaction_date, order_type, price, quantity, limit_price = row
+                price = float(price)
+                quantity = int(quantity)
+
+                db_manager.insert_transaction(
+                    portfolio_id, ticker, name, transaction_date, order_type, price, quantity, limit_price)
+
+            flash("Portfolio imported successfully!", "success")
+
+        except Exception as e:
+            flash(f"Error importing portfolio: {e}", "danger")
+
+    return redirect(url_for("dashboard"))
+
+
 @app.route('/buy', methods=['GET', 'POST'])
 def buy():
+    valid_tickers = portfolio_manager.valid_tickers
     if 'user_id' not in session:
         return redirect(url_for('index'))
 
@@ -227,7 +330,6 @@ def buy():
             flash('Invalid quantity', 'error')
             return redirect(url_for('buy'))
 
-        valid_tickers = portfolio_manager.valid_tickers
         if ticker not in valid_tickers:
             flash(f'Invalid ticker: {ticker}', 'error')
             return redirect(url_for('buy'))
@@ -258,13 +360,16 @@ def buy():
         db_manager.insert_transaction(portfolio_id, ticker, asset_name, transaction_date,
                                       order_type, price, quantity, limit_price)
 
-        flash(f'Successfully purchased {quantity} shares of {ticker} at ${price:.2f}', 'success')
+        flash(
+            f'Successfully purchased {quantity} shares of {ticker} at ${price:.2f}', 'success')
         return redirect(url_for('dashboard'))
 
-    return render_template('buy.html', name=session.get('name', 'User'))
+    return render_template('buy.html', name=session.get('name', 'User'), stock_list=valid_tickers)
+
 
 @app.route('/sell', methods=['GET', 'POST'])
 def sell():
+    valid_tickers = portfolio_manager.valid_tickers
     if 'user_id' not in session:
         return redirect(url_for('index'))
 
@@ -282,7 +387,6 @@ def sell():
             flash('Invalid quantity', 'error')
             return redirect(url_for('sell'))
 
-        valid_tickers = portfolio_manager.valid_tickers
         if ticker not in valid_tickers:
             flash(f'Invalid ticker: {ticker}', 'error')
             return redirect(url_for('sell'))
@@ -313,10 +417,11 @@ def sell():
         db_manager.insert_transaction(portfolio_id, ticker, asset_name, transaction_date,
                                       order_type, price, -quantity, limit_price)
 
-        flash(f'Successfully sold {quantity} shares of {ticker} at ${price:.2f}', 'success')
+        flash(
+            f'Successfully sold {quantity} shares of {ticker} at ${price:.2f}', 'success')
         return redirect(url_for('dashboard'))
 
-    return render_template('sell.html', name=session.get('name', 'User'))
+    return render_template('sell.html', name=session.get('name', 'User'), stock_list=valid_tickers)
 
 
 @app.route('/historical', methods=['GET', 'POST'])
@@ -504,7 +609,8 @@ def explore_news():
                     'source': item.get('media', 'Unknown')
                 } for item in results[:10]]
         else:
-            flash(f"Ticker '{ticker}' not found. Did you mean one of these?", 'error')
+            flash(
+                f"Ticker '{ticker}' not found. Did you mean one of these?", 'error')
 
             # Suggest similar tickers
             direct_matches = [
@@ -518,7 +624,6 @@ def explore_news():
                 if ticker.lower() in data['name'].lower() and not t.startswith(ticker)
             ]
             matching_tickers = (direct_matches + fuzzy_matches)[:10]
-
 
     return render_template(
         'explore_news.html',
@@ -534,7 +639,7 @@ def explore_news():
 def explore_filter():
     """
     Filter and explore stocks by sector, industry, or company name.
-    
+
     This route handles filtering of stock data based on user selection.
     It loads sector/industry data from CSV, processes filter parameters,
     and returns filtered results along with additional stock metrics
@@ -739,7 +844,8 @@ def get_portfolio_performance_data(portfolio_id):
             if quantity == 0 or ticker not in ticker_data:
                 continue
             price_data = ticker_data[ticker]
-            closest_dates = price_data.index[price_data.index <= pd.Timestamp(current_date)]
+            closest_dates = price_data.index[price_data.index <= pd.Timestamp(
+                current_date)]
             if len(closest_dates) > 0:
                 closest_date = closest_dates[-1]
                 price = float(price_data.loc[closest_date, 'Close'])
@@ -754,6 +860,7 @@ def get_portfolio_performance_data(portfolio_id):
         })
 
     return performance_data
+
 
 def get_portfolio_sector_data(portfolio_id):
     """
@@ -775,8 +882,10 @@ def get_portfolio_sector_data(portfolio_id):
         else:
             sector = "Unknown"
         sector_values[sector] = sector_values.get(sector, 0) + value
-    sector_data = [{'sector': str(sector), 'value': float(round(value, 2))} for sector, value in sector_values.items()]
+    sector_data = [{'sector': str(sector), 'value': float(
+        round(value, 2))} for sector, value in sector_values.items()]
     return sector_data
+
 
 def convert_to_serializable(obj):
     """

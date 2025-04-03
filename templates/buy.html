@@ -2,6 +2,18 @@
 
 {% block title %}3415x Returns - Buy Stock{% endblock %}
 
+{% block extra_css %}
+<!-- Select2 Styles -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet">
+<style>
+    .select2-container .select2-selection--single {
+        height: 38px;
+        padding: 6px;
+        font-size: 16px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-lg-8">
@@ -20,7 +32,12 @@
                 <form action="{{ url_for('buy') }}" method="post">
                     <div class="mb-3">
                         <label for="ticker" class="form-label">Stock Ticker Symbol:</label>
-                        <input type="text" class="form-control" id="ticker" name="ticker" placeholder="e.g. AAPL, MSFT, GOOGL" required>
+                        <select class="form-select" id="ticker" name="ticker" required>
+                            <option value="">Select a stock...</option>
+                            {% for ticker in stock_list %}
+                                <option value="{{ ticker }}">{{ ticker }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     
                     <div class="mb-3">
@@ -61,4 +78,19 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- jQuery & Select2 -->
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+        $("#ticker").select2({
+            placeholder: "Type to search...",
+            allowClear: true
+        });
+    });
+</script>
 {% endblock %}
