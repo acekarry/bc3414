@@ -9,7 +9,7 @@ from flask import Flask, request, redirect, url_for
 import io
 import csv
 from collections import defaultdict
-
+import urllib.parse
 
 from DatabaseManager import DatabaseManager
 from PortfolioManager import PortfolioManager
@@ -604,7 +604,11 @@ def explore_news():
             if results:
                 news = [{
                     'title': item['title'],
-                    'link': item['link'],
+                    # tried to fix this but only works on some sites like insider monkey
+                    'link': urllib.parse.quote(
+                        item['link'].split("&url=")[
+                            1] if "&url=" in item['link'] else item['link'],
+                        safe=":/?&="),
                     'date': item.get('date', 'N/A'),
                     'source': item.get('media', 'Unknown')
                 } for item in results[:10]]
