@@ -34,8 +34,8 @@
                         <label for="ticker" class="form-label">Stock Ticker Symbol:</label>
                         <select class="form-select" id="ticker" name="ticker" required>
                             <option value="">Select a stock...</option>
-                            {% for ticker in stock_list %}
-                                <option value="{{ ticker }}">{{ ticker }}</option>
+                            {% for ticker, data in stock_list.items() %}
+                                <option value="{{ ticker }}">{{ ticker }} - {{data.name}}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -78,4 +78,19 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- jQuery & Select2 -->
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+        $("#ticker").select2({
+            placeholder: "Type to search...",
+            allowClear: true
+        });
+    });
+</script>
 {% endblock %}

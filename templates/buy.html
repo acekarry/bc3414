@@ -34,8 +34,8 @@
                         <label for="ticker" class="form-label">Stock Ticker Symbol:</label>
                         <select class="form-select" id="ticker" name="ticker" required>
                             <option value="">Select a stock...</option>
-                            {% for ticker in stock_list %}
-                                <option value="{{ ticker }}">{{ ticker }}</option>
+                            {% for ticker, data in stock_list.items() %}
+                                <option value="{{ ticker }}">{{ ticker }} - {{data.name}}</option>
                             {% endfor %}
                         </select>
                     </div>
