@@ -17,7 +17,8 @@ class NewsScraper:
         for news in results[:num_results]:
             title = news['title']
             link = news['link']
-            # ANSI escape sequences for hyperlinks (supported in some terminals)
+            #ANSI escape sequences for hyperlinks (supported in some terminals)
             hyperlink = f"    \033]8;;{link}\033\\{title}\033]8;;\033\\"
             print(hyperlink, "\n")
 
+# 

@@ -10,6 +10,7 @@ import io
 import csv
 from collections import defaultdict
 import urllib.parse
+import requests
 
 from DatabaseManager import DatabaseManager
 from PortfolioManager import PortfolioManager
@@ -595,23 +596,33 @@ def explore_news():
         if ticker in valid_tickers:
             asset_name = valid_tickers[ticker]["name"]
 
-            # Get news using GoogleNews
-            from GoogleNews import GoogleNews
-            googlenews = GoogleNews(lang='en', region='US')
-            googlenews.clear()
-            googlenews.search(asset_name)
-            results = googlenews.results()
-            if results:
+            api_key = "bf93721d5d8c4ebaa70216a43ee0350f"
+
+            # Make the request to NewsAPI
+            response = requests.get(
+                "https://newsapi.org/v2/everything",
+                params={
+                    "q": asset_name,
+                    "language": "en",
+                    "sortBy": "publishedAt",
+                    "pageSize": 10,
+                    "apiKey": api_key
+                }
+            )
+
+            data = response.json()
+
+            # Handle error or empty result
+            if data.get("status") != "ok" or not data.get("articles"):
+                news = []
+            else:
                 news = [{
-                    'title': item['title'],
-                    # tried to fix this but only works on some sites like insider monkey
-                    'link': urllib.parse.quote(
-                        item['link'].split("&url=")[
-                            1] if "&url=" in item['link'] else item['link'],
-                        safe=":/?&="),
-                    'date': item.get('date', 'N/A'),
-                    'source': item.get('media', 'Unknown')
-                } for item in results[:10]]
+                    'title': article['title'],
+                    'link': article['url'],
+                    'date': article.get('publishedAt', 'N/A'),
+                    'source': article.get('source', {}).get('name', 'Unknown')
+                } for article in data['articles']]
+
         else:
             flash(
                 f"Ticker '{ticker}' not found. Did you mean one of these?", 'error')
