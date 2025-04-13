@@ -602,7 +602,7 @@ def explore_news():
             response = requests.get(
                 "https://newsapi.org/v2/everything",
                 params={
-                    "q": asset_name,
+                    "q": f"{asset_name} stock",
                     "language": "en",
                     "sortBy": "publishedAt",
                     "pageSize": 10,
@@ -622,6 +622,7 @@ def explore_news():
                     'date': article.get('publishedAt', 'N/A'),
                     'source': article.get('source', {}).get('name', 'Unknown')
                 } for article in data['articles']]
+
 
         else:
             flash(
