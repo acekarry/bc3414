@@ -20,14 +20,13 @@ from market_overview import get_market_data
 
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)  # For session management
+app.secret_key = os.urandom(24) 
 
-# Initialize managers
+
 db_manager = DatabaseManager()
 portfolio_manager = PortfolioManager()
 stock_explorer = StockExplorer()
 news_scraper = NewsScraper()
-# Teardown the per-request database connection
 
 
 @app.teardown_appcontext
@@ -57,11 +56,6 @@ def setup_historical_routes(app, portfolio_manager):
         return render_template('ticker_results.html',
                                matching_tickers=matching_tickers,
                                query=query)
-
-# -------------------------
-# Routes
-# -------------------------
-
 
 @app.route('/')
 def index():
@@ -500,14 +494,12 @@ def ticker_search():
 
     matching_tickers = []
     if query:
-        # Direct matches (tickers that start with the query)
         direct_matches = [
             (ticker, data['name'])
             for ticker, data in valid_tickers.items()
             if ticker.startswith(query)
         ]
 
-        # Fuzzy matches (company names containing the query)
         fuzzy_matches = [
             (ticker, data['name'])
             for ticker, data in valid_tickers.items()
@@ -534,14 +526,12 @@ def search_ticker():
 
     valid_tickers = portfolio_manager.valid_tickers
 
-    # Direct matches (tickers that start with the query)
     direct_matches = [
         {'ticker': ticker, 'name': data['name']}
         for ticker, data in valid_tickers.items()
         if ticker.startswith(query)
     ]
 
-    # Fuzzy matches (company names containing the query)
     fuzzy_matches = [
         {'ticker': ticker, 'name': data['name']}
         for ticker, data in valid_tickers.items()
@@ -572,30 +562,26 @@ def explore_news():
     ticker = request.args.get('ticker', '').upper()
     query = request.args.get('query', '')
 
-    # Handle search suggestions (without JavaScript)
     matching_tickers = []
     valid_tickers = portfolio_manager.valid_tickers
     if query and not ticker:
-        # Direct matches (tickers that start with the query)
         direct_matches = [
             {'ticker': t, 'name': data['name']}
             for t, data in valid_tickers.items()
             if t.startswith(query.upper())
         ]
-        # Fuzzy matches (company names containing the query)
         fuzzy_matches = [
             {'ticker': t, 'name': data['name']}
             for t, data in valid_tickers.items()
             if query.lower() in data['name'].lower() and not t.startswith(query.upper())
         ]
         matching_tickers = direct_matches + fuzzy_matches
-        matching_tickers = matching_tickers[:10]  # Limit to 10 results
+        matching_tickers = matching_tickers[:10]  
 
     if ticker:
         if ticker in valid_tickers:
             asset_name = valid_tickers[ticker]["name"]
 
-            # Get news using GoogleNews
             from GoogleNews import GoogleNews
             googlenews = GoogleNews(lang='en', region='US')
             googlenews.clear()
@@ -604,7 +590,6 @@ def explore_news():
             if results:
                 news = [{
                     'title': item['title'],
-                    # tried to fix this but only works on some sites like insider monkey
                     'link': urllib.parse.quote(
                         item['link'].split("&url=")[
                             1] if "&url=" in item['link'] else item['link'],
@@ -616,7 +601,6 @@ def explore_news():
             flash(
                 f"Ticker '{ticker}' not found. Did you mean one of these?", 'error')
 
-            # Suggest similar tickers
             direct_matches = [
                 {'ticker': t, 'name': data['name']}
                 for t, data in valid_tickers.items()
@@ -641,55 +625,47 @@ def explore_news():
 
 @app.route('/explore/filter', methods=['GET', 'POST'])
 def explore_filter():
-    """
-    Filter and explore stocks by sector, industry, or company name.
-
-    This route handles filtering of stock data based on user selection.
-    It loads sector/industry data from CSV, processes filter parameters,
-    and returns filtered results along with additional stock metrics
-    when a specific stock is selected.
-    """
-    # Check if user is logged in
     if 'user_id' not in session:
         return redirect(url_for('index'))
 
     try:
-        # Load and prepare data
         sector_df = pd.read_csv("SnP_tickers_sector.csv")
-
-        # Detect and handle column names with or without asterisks
         columns = sector_df.columns.tolist()
         sector_col = next(
             (col for col in columns if col.endswith('GICS Sector')), 'GICS Sector')
         industry_col = next((col for col in columns if col.endswith(
             'GICS Sub-Industry')), 'GICS Sub-Industry')
 
-        # Remove location column if present (with or without asterisk)
+
         location_cols = [
             col for col in columns if 'Headquarters Location' in col]
         if location_cols:
             sector_df = sector_df.drop(columns=location_cols)
-
-        # Get unique values for dropdowns
         sectors = sorted(sector_df[sector_col].dropna().unique())
         industries = sorted(sector_df[industry_col].dropna().unique())
 
-        # Process filter parameters
+
         filter_type = request.args.get('filter_type', 'sector')
-        filter_value = request.args.get('filter_value', '')
         selected_ticker = request.args.get('ticker', '')
 
-        # Log the request parameters for debugging
+        filter_value = ''
+        if filter_type == 'sector':
+            filter_value = request.args.get('sector_select', '')
+        elif filter_type == 'industry':
+            filter_value = request.args.get('industry_select', '')
+        elif filter_type == 'name':
+            filter_value = request.args.get('name_input', '')
+        else:
+            filter_value = request.args.get('filter_value', '')
+
         app.logger.info(
             f"Filter request - Type: {filter_type}, Value: {filter_value}, Ticker: {selected_ticker}")
 
         results = []
         ticker_metrics = {}
 
-        # Apply filtering based on filter type and value
         if filter_type and filter_value:
             if filter_type == "sector":
-                # Filter by sector
                 filtered = sector_df[sector_df[sector_col].str.contains(
                     filter_value, case=False, na=False)]
                 if not filtered.empty:
@@ -698,7 +674,6 @@ def explore_filter():
                         f"Found {len(results)} results for sector: {filter_value}")
 
             elif filter_type == "industry":
-                # Filter by industry
                 filtered = sector_df[sector_df[industry_col].str.contains(
                     filter_value, case=False, na=False)]
                 if not filtered.empty:
@@ -707,14 +682,11 @@ def explore_filter():
                         f"Found {len(results)} results for industry: {filter_value}")
 
             elif filter_type == "name":
-                # Filter by company name or symbol - try both columns
                 name_filtered = sector_df[sector_df["Security"].str.contains(
                     filter_value, case=False, na=False)]
 
                 symbol_filtered = sector_df[sector_df["Symbol"].str.contains(
                     filter_value, case=False, na=False)]
-
-                # Combine results and remove duplicates
                 filtered = pd.concat(
                     [name_filtered, symbol_filtered]).drop_duplicates()
 
@@ -726,9 +698,7 @@ def explore_filter():
                     app.logger.info(
                         f"No results found for name/symbol: {filter_value}")
 
-        # If specific ticker is selected, fetch additional metrics
         if selected_ticker:
-            # If we don't have the ticker in results, look it up directly
             if not results:
                 ticker_filtered = sector_df[sector_df["Symbol"]
                                             == selected_ticker]
@@ -736,7 +706,6 @@ def explore_filter():
                     results = ticker_filtered.to_dict('records')
 
             try:
-                # Fetch additional metrics using yfinance
                 ticker_obj = yf.Ticker(selected_ticker)
                 info = ticker_obj.info
 
@@ -757,14 +726,12 @@ def explore_filter():
                     f"Error fetching metrics for {selected_ticker}: {e}")
 
     except Exception as e:
-        # Handle any unexpected errors
         app.logger.error(f"Error in explore_filter: {e}")
         flash(f"An error occurred: {e}", "error")
         sectors, industries = [], []
         results = []
         ticker_metrics = {}
 
-    # Render template with all necessary data
     return render_template('explore_filter.html',
                            sectors=sectors,
                            industries=industries,
@@ -776,16 +743,7 @@ def explore_filter():
                            name=session.get('name', 'User'))
 
 
-# -------------------------
-# Helper Functions
-# -------------------------
-
 def get_portfolio_performance_data(portfolio_id):
-    """
-    Get portfolio performance data over time for charts.
-    This function aggregates transaction data, fetches historical prices via yfinance,
-    and computes portfolio value, net deposits, and returns at monthly intervals.
-    """
     cursor = db_manager.get_cursor()
     cursor.execute(
         "SELECT transaction_date, ticker, price, quantity FROM transactions WHERE portfolio_id = ? ORDER BY transaction_date, id",
@@ -795,7 +753,6 @@ def get_portfolio_performance_data(portfolio_id):
     if not transactions:
         return []
 
-    # Parse transactions
     transactions_parsed = []
     for t in transactions:
         trans_date = datetime.strptime(t[0], "%Y-%m-%d").date()
@@ -804,7 +761,6 @@ def get_portfolio_performance_data(portfolio_id):
     start_date = min(t[0] for t in transactions_parsed)
     end_date = date.today()
 
-    # Generate monthly dates for the chart
     current_date = start_date
     chart_dates = []
     while current_date <= end_date:
@@ -815,8 +771,6 @@ def get_portfolio_performance_data(portfolio_id):
             current_date = date(current_date.year, current_date.month + 1, 1)
     if chart_dates[-1] != end_date:
         chart_dates.append(end_date)
-
-    # Fetch historical price data for all involved tickers
     tickers_involved = set(t[1] for t in transactions_parsed)
     ticker_data = {}
     for ticker in tickers_involved:
@@ -834,7 +788,6 @@ def get_portfolio_performance_data(portfolio_id):
         positions = {}
         net_deposits = 0.0
 
-        # Aggregate transactions up to the current date
         for trans in transactions_parsed:
             if trans[0] <= current_date:
                 ticker = trans[1]
@@ -867,10 +820,7 @@ def get_portfolio_performance_data(portfolio_id):
 
 
 def get_portfolio_sector_data(portfolio_id):
-    """
-    Get portfolio sector allocation data for a pie chart.
-    This function aggregates transactions to calculate the total value per sector.
-    """
+
     positions = db_manager.check_portfolio(portfolio_id)
     sector_values = {}
     for ticker, data in positions.items():
@@ -892,9 +842,7 @@ def get_portfolio_sector_data(portfolio_id):
 
 
 def convert_to_serializable(obj):
-    """
-    Convert pandas, numpy, or datetime objects to JSON serializable types.
-    """
+
     import pandas as pd
     import numpy as np
 
@@ -908,14 +856,11 @@ def convert_to_serializable(obj):
         return int(obj)
     elif isinstance(obj, (np.float64, np.float32, np.float16)):
         return float(obj)
-    elif hasattr(obj, 'isoformat'):  # For datetime objects
+    elif hasattr(obj, 'isoformat'):  
         return obj.isoformat()
     else:
         return obj
 
 
-# -------------------------
-# Run the App
-# -------------------------
 if __name__ == '__main__':
     app.run(debug=True)

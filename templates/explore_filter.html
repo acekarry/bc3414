@@ -27,44 +27,41 @@
                 <form id="filterForm" action="{{ url_for('explore_filter') }}" method="get">
                     <div class="mb-3">
                         <label for="filter_type" class="form-label">Filter By:</label>
-                        <select class="form-select" id="filter_type" name="filter_type">
+                        <select class="form-select" id="filter_type" name="filter_type" onchange="this.form.submit()">
                             <option value="sector" {% if filter_type == 'sector' %}selected{% endif %}>Sector</option>
                             <option value="industry" {% if filter_type == 'industry' %}selected{% endif %}>Industry</option>
                             <option value="name" {% if filter_type == 'name' %}selected{% endif %}>Company Name</option>
                         </select>
                     </div>
                     
-                    <!-- Single hidden field for filter value -->
-                    <input type="hidden" id="filter_value" name="filter_value" value="{{ filter_value }}">
-                    
-                    <!-- Sector selection field -->
-                    <div id="sectorField" class="mb-3 {% if filter_type != 'sector' %}d-none{% endif %}">
+                    <!-- Show only the relevant filter field based on current filter_type -->
+                    {% if filter_type == 'sector' %}
+                    <div class="mb-3">
                         <label for="sector_select" class="form-label">Select Sector:</label>
-                        <select class="form-select" id="sector_select">
+                        <select class="form-select" id="sector_select" name="sector_select">
                             <option value="">-- Select a Sector --</option>
                             {% for sector in sectors %}
-                            <option value="{{ sector }}" {% if filter_type == 'sector' and filter_value == sector %}selected{% endif %}>{{ sector }}</option>
+                            <option value="{{ sector }}" {% if filter_value == sector %}selected{% endif %}>{{ sector }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    
-                    <!-- Industry selection field -->
-                    <div id="industryField" class="mb-3 {% if filter_type != 'industry' %}d-none{% endif %}">
+                    {% elif filter_type == 'industry' %}
+                    <div class="mb-3">
                         <label for="industry_select" class="form-label">Select Industry:</label>
-                        <select class="form-select" id="industry_select">
+                        <select class="form-select" id="industry_select" name="industry_select">
                             <option value="">-- Select an Industry --</option>
                             {% for industry in industries %}
-                            <option value="{{ industry }}" {% if filter_type == 'industry' and filter_value == industry %}selected{% endif %}>{{ industry }}</option>
+                            <option value="{{ industry }}" {% if filter_value == industry %}selected{% endif %}>{{ industry }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    
-                    <!-- Company name search field -->
-                    <div id="nameField" class="mb-3 {% if filter_type != 'name' %}d-none{% endif %}">
+                    {% elif filter_type == 'name' %}
+                    <div class="mb-3">
                         <label for="name_input" class="form-label">Company Name or Symbol:</label>
-                        <input type="text" class="form-control" id="name_input" 
-                               placeholder="Enter company name or ticker" value="{{ filter_value if filter_type == 'name' else '' }}">
+                        <input type="text" class="form-control" id="name_input" name="name_input"
+                               placeholder="Enter company name or ticker" value="{{ filter_value }}">
                     </div>
+                    {% endif %}
                     
                     <button type="submit" class="btn btn-primary w-100">
                         <i class="fas fa-filter me-1"></i>Apply Filter
@@ -197,83 +194,4 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    // Function to show the appropriate field based on filter type
-    function showFilterField(filterType) {
-        const sectorField = document.getElementById('sectorField');
-        const industryField = document.getElementById('industryField');
-        const nameField = document.getElementById('nameField');
-        
-        // Hide all fields first
-        sectorField.classList.add('d-none');
-        industryField.classList.add('d-none');
-        nameField.classList.add('d-none');
-        
-        // Show the appropriate field
-        if (filterType === 'sector') {
-            sectorField.classList.remove('d-none');
-        } else if (filterType === 'industry') {
-            industryField.classList.remove('d-none');
-        } else if (filterType === 'name') {
-            nameField.classList.remove('d-none');
-        }
-    }
-    
-    // Initialize page - show the appropriate field when the page loads
-    document.addEventListener('DOMContentLoaded', function() {
-        const filterType = document.getElementById('filter_type').value;
-        showFilterField(filterType);
-        
-        // Pre-select the correct value in dropdown based on current filter_value
-        const filterValue = document.getElementById('filter_value').value;
-        
-        if (filterType === 'sector' && filterValue) {
-            const sectorSelect = document.getElementById('sector_select');
-            for (let i = 0; i < sectorSelect.options.length; i++) {
-                if (sectorSelect.options[i].value === filterValue) {
-                    sectorSelect.selectedIndex = i;
-                    break;
-                }
-            }
-        } else if (filterType === 'industry' && filterValue) {
-            const industrySelect = document.getElementById('industry_select');
-            for (let i = 0; i < industrySelect.options.length; i++) {
-                if (industrySelect.options[i].value === filterValue) {
-                    industrySelect.selectedIndex = i;
-                    break;
-                }
-            }
-        } else if (filterType === 'name' && filterValue) {
-            document.getElementById('name_input').value = filterValue;
-        }
-    });
-    
-    // Toggle filter fields when filter type changes
-    document.getElementById('filter_type').addEventListener('change', function() {
-        showFilterField(this.value);
-    });
-    
-    // Form validation and submission
-    document.getElementById('filterForm').addEventListener('submit', function(event) {
-        const filterType = document.getElementById('filter_type').value;
-        let filterValue = '';
-        
-        if (filterType === 'sector') {
-            filterValue = document.getElementById('sector_select').value;
-        } else if (filterType === 'industry') {
-            filterValue = document.getElementById('industry_select').value;
-        } else if (filterType === 'name') {
-            filterValue = document.getElementById('name_input').value.trim();
-        }
-        
-        if (!filterValue) {
-            event.preventDefault();
-            alert('Please select or enter a filter value');
-            return;
-        }
-        
-        // Set the hidden filter_value field with the selected value
-        document.getElementById('filter_value').value = filterValue;
-    });
-</script>
 {% endblock %}
