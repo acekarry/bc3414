@@ -7,12 +7,6 @@ import random
 
 
 def get_market_data():
-    """
-    Fetches market data for major indices or uses mock data if fetching fails
-    
-    Returns:
-        Dictionary with index data for S&P 500, Dow Jones, and NASDAQ
-    """
     indices = {
         'sp500': {
             'symbol': '^GSPC',
@@ -64,9 +58,6 @@ def get_market_data():
 
 
 def generate_mock_data(index):
-    """
-    Generates mock data for an index when real data can't be fetched
-    """
     base_prices = {
         '^GSPC': 4500,  # S&P 500
         '^DJI': 35000,  # Dow Jones

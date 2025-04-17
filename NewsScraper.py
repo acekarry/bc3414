@@ -5,10 +5,9 @@ class NewsScraper:
         self.googlenews = GoogleNews(lang=lang, region=region)
 
     def show_news(self, asset_name, num_results=5):
-        """Fetch and display top news headlines for the given asset_name with clickable hyperlinks."""
-        self.googlenews.clear()  # Clear any previous search results
+        self.googlenews.clear() 
         self.googlenews.search(asset_name)
-        results = self.googlenews.results()
+        results = self.googlenews.results() # get top headlines
         if not results:
             print(f"No news found for {asset_name}.")
             return
@@ -17,7 +16,6 @@ class NewsScraper:
         for news in results[:num_results]:
             title = news['title']
             link = news['link']
-            # ANSI escape sequences for hyperlinks (supported in some terminals)
-            hyperlink = f"    \033]8;;{link}\033\\{title}\033]8;;\033\\"
+            hyperlink = f"    \033]8;;{link}\033\\{title}\033]8;;\033\\" #regex fix
             print(hyperlink, "\n")
 
