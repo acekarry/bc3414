@@ -10,6 +10,7 @@ import io
 import csv
 from collections import defaultdict
 import urllib.parse
+import requests
 
 from DatabaseManager import DatabaseManager
 from PortfolioManager import PortfolioManager
@@ -582,14 +583,29 @@ def explore_news():
         if ticker in valid_tickers:
             asset_name = valid_tickers[ticker]["name"]
 
-            from GoogleNews import GoogleNews
-            googlenews = GoogleNews(lang='en', region='US')
-            googlenews.clear()
-            googlenews.search(asset_name)
-            results = googlenews.results()
-            if results:
+            api_key = "bf93721d5d8c4ebaa70216a43ee0350f"
+
+            # Make the request to NewsAPI
+            response = requests.get(
+                "https://newsapi.org/v2/everything",
+                params={
+                    "q": f"{asset_name} stock",
+                    "language": "en",
+                    "sortBy": "publishedAt",
+                    "pageSize": 10,
+                    "apiKey": api_key
+                }
+            )
+
+            data = response.json()
+
+            # Handle error or empty result
+            if data.get("status") != "ok" or not data.get("articles"):
+                news = []
+            else:
                 news = [{
                     'title': item['title'],
+                    # tried to fix this but only works on some sites like insider monkey
                     'link': urllib.parse.quote(
                         item['link'].split("&url=")[
                             1] if "&url=" in item['link'] else item['link'],

@@ -19,3 +19,4 @@ class NewsScraper:
             hyperlink = f"    \033]8;;{link}\033\\{title}\033]8;;\033\\" #regex fix
             print(hyperlink, "\n")
 
+# 
